@@ -541,7 +541,7 @@ export const entries = [
       { to: 'muay-thai', note: 'Le crochet existe aussi en muay-thaï ; la même rotation du buste sert aux coups de coude, à n’aborder qu’avec un enseignant.', reliability: 'plausible' }
     ],
     sources: [SOURCE_IA],
-    sequence: null,
+    sequence: 'crochet',
     editorial: draft()
   },
   {
@@ -1049,7 +1049,7 @@ export const entries = [
       { to: 'boxe', note: 'La parade de boxe dévie aussi par un petit geste de main, sans lame ; l’idée « dévier puis répondre aussitôt » se retrouve.', reliability: 'plausible' }
     ],
     sources: [S.nwFencing],
-    sequence: null,
+    sequence: 'escrime-parade-riposte',
     editorial: nouvelle('sourcee')
   },
 
@@ -1095,7 +1095,7 @@ export const entries = [
       { to: 'transversal', note: 'Rentrer le menton et ne pas amortir avec les bras tendus pourrait aussi servir lors de chutes de la vie courante ; transfert supposé, non étudié ici.', reliability: 'experimental' }
     ],
     sources: [S.judoQuebec, S.murayama2020],
-    sequence: null,
+    sequence: 'chute-arriere',
     editorial: nouvelle('sourcee')
   },
   {
@@ -1267,7 +1267,7 @@ export const entries = [
       { to: 'jjb', note: 'Le sprawl est très utilisé en jiu-jitsu brésilien et en combat libre pour éviter une amenée au sol.', reliability: 'plausible' }
     ],
     sources: [S.usaw2001],
-    sequence: null,
+    sequence: 'sprawl',
     editorial: nouvelle('sourcee')
   },
 

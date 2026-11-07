@@ -101,7 +101,47 @@ export const sequences = [
       {label: 'Posture avant', pose: kara({}), cue: 'Jambe avant fléchie, jambe arrière tendue, pied arrière à plat.'},
       {label: 'Départ', ms: 260, pose: kara({rearShoulder: 30, rearElbow: 90, leadShoulder: 40, leadElbow: 50}), cue: 'Le poing arrière quitte la hanche, l’avant commence à revenir.'},
       {label: 'Impact à vide', ms: 220, pose: kara({rearShoulder: 86, rearElbow: 4, leadShoulder: -28, leadElbow: 112}), cue: 'Bras tendu à hauteur de plexus, poing avant ramené à la hanche.'},
-      {label: 'Retour', ms: 420, pose: kara({}), cue: 'Revenir lentement en posture.'}]}
+      {label: 'Retour', ms: 420, pose: kara({}), cue: 'Revenir lentement en posture.'}]},
+  // ——— Ajouts du 07/11 : rotation complète (face) et travail au sol (appui par tout le corps) ———
+  {id: 'crochet', name: 'Crochet avant, à vide', track: ['leadWrist', 'head'],
+    note: 'Bras en arc à hauteur d’épaule ; la rotation des hanches et du buste porte le coup (illustration 3D : le bras s’écarte sur le côté).',
+    keys: [
+      {label: 'Garde', pose: pose(), cue: 'Garde haute, coude avant près du corps.'},
+      {label: 'Charge', ms: 300, pose: {...pose({torso: 10}), d3: {chestTurn: 18}}, cue: 'Le buste se charge légèrement vers l’arrière.'},
+      {label: 'Crochet', ms: 240, pose: {...pose({torso: 8, leadShoulder: -8, leadElbow: 95}), d3: {leadArmAbd: 85, chestTurn: -24, turn: 14, leadFootOut: 34}}, cue: 'Le pied avant pivote, la hanche tourne, le bras en arc reste plié.'},
+      {label: 'Retour', ms: 420, pose: pose(), cue: 'Ramener le bras en garde, menton protégé.'}]},
+  {id: 'coup-pied-retourne', name: 'Coup de pied retourné, à vide', track: ['rearToe', 'head'],
+    note: 'Volte sur le pied avant, regard par-dessus l’épaule, jambe arrière poussée vers la cible. Geste avancé : lentement, à vide, sur sol sûr.',
+    keys: [
+      {label: 'Garde', pose: pose(), cue: 'Garde stable.'},
+      {label: 'Volte', ms: 420, pose: {...pose({torso: 18, leadKnee: 26}), d3: {face: 110}}, cue: 'Pivoter sur l’avant du pied avant, regarder par-dessus l’épaule.'},
+      {label: 'Armé', ms: 320, pose: {...pose({torso: 40, leadKnee: 24, rearHip: 34, rearKnee: 110, rearAnkle: 20}), d3: {face: 180, leadAbd: -6, turn: 60}}, cue: 'Dos à la cible, genou arrière ramené.'},
+      {label: 'Frappe', ms: 280, pose: {...pose({torso: 64, neck: -34, leadHip: 12, leadKnee: 22, rearHip: -70, rearKnee: 4, rearAnkle: 26}), d3: {face: 180, leadAbd: -6, turn: 60}}, cue: 'Talon poussé vers la cible, buste en contrepoids.'},
+      {label: 'Reprise', ms: 380, pose: {...pose({torso: 22, rearHip: 10, rearKnee: 60}), d3: {face: 270}}, cue: 'Ramener la jambe en finissant le tour.'},
+      {label: 'Garde', ms: 420, pose: {...pose(), d3: {face: 360}}, cue: 'Retour en garde face à la cible.'}]},
+  {id: 'escrime-parade-riposte', style: 'escrime', name: 'Parade et riposte (escrime, à vide)', track: ['leadWrist', 'pelvis'],
+    keys: [
+      {label: 'En garde', pose: fence(), cue: 'Garde d’escrime, bras armé souple.'},
+      {label: 'Parade', ms: 220, pose: {...fence({leadShoulder: 44, leadElbow: 38}), d3: {leadArmAbd: 26}}, cue: 'Petit déplacement de la main : la lame écarte l’attaque.'},
+      {label: 'Riposte', ms: 260, pose: fence({torso: 4, leadShoulder: 86, leadElbow: 2}), cue: 'Le bras s’allonge aussitôt vers la cible.'},
+      {label: 'En garde', ms: 420, pose: fence(), cue: 'Retour en garde.'}]},
+  {id: 'chute-arriere', style: 'carre', ground: true, name: 'Chute arrière amortie (ukemi), au sol', track: ['head', 'pelvis'],
+    note: 'Descendre près du sol, rouler sur le dos menton rentré, frapper le sol des deux bras. À apprendre sur tapis avec un enseignant.',
+    keys: [
+      {label: 'Debout', pose: pose({torso: 4, leadHip: 6, leadKnee: 8, rearHip: -6, rearKnee: 8, leadShoulder: 30, rearShoulder: 30, leadElbow: 30, rearElbow: 30}), cue: 'Debout, détendu.'},
+      {label: 'Accroupi', ms: 600, pose: pose({torso: 48, neck: 30, leadHip: 108, leadKnee: 140, leadAnkle: 22, rearHip: 104, rearKnee: 140, rearAnkle: 26, leadShoulder: 62, rearShoulder: 62, leadElbow: 0, rearElbow: 0}), cue: 'Descendre près du sol, bras devant.'},
+      {label: 'Roulé', ms: 520, pose: pose({torso: -70, neck: 52, leadHip: 150, leadKnee: 90, leadAnkle: 10, rearHip: 146, rearKnee: 90, rearAnkle: 10, leadShoulder: 150, rearShoulder: 150, leadElbow: 20, rearElbow: 20}), cue: 'S’asseoir près des talons et rouler, menton rentré.'},
+      {label: 'Frappe du sol', ms: 320, pose: {...pose({torso: -84, neck: 55, leadHip: 140, leadKnee: 50, leadAnkle: 10, rearHip: 136, rearKnee: 50, rearAnkle: 10, leadShoulder: 129, rearShoulder: 129, leadElbow: 0, rearElbow: 0}), d3: {leadArmAbd: 88, rearArmAbd: 88}}, cue: 'Les bras frappent le sol à 45°, la tête ne touche pas.'},
+      {label: 'Retour assis', ms: 700, pose: pose({torso: -70, neck: 52, leadHip: 150, leadKnee: 90, leadAnkle: 10, rearHip: 146, rearKnee: 90, rearAnkle: 10, leadShoulder: 150, rearShoulder: 150, leadElbow: 20, rearElbow: 20}), cue: 'Rouler vers l’avant.'},
+      {label: 'Accroupi', ms: 600, pose: pose({torso: 48, neck: 30, leadHip: 108, leadKnee: 140, leadAnkle: 22, rearHip: 104, rearKnee: 140, rearAnkle: 26, leadShoulder: 62, rearShoulder: 62, leadElbow: 0, rearElbow: 0}), cue: 'Revenir sur les pieds, accroupi.'}]},
+  {id: 'sprawl', style: 'carre', ground: true, name: 'Sprawl (défense des jambes), au sol', track: ['pelvis', 'leadToe'],
+    note: 'Les jambes partent en arrière, les hanches écrasent vers le sol, les mains se posent : on évite la saisie des jambes.',
+    keys: [
+      {label: 'Garde', pose: pose({torso: 12, leadKnee: 28}), cue: 'Garde basse, prête.'},
+      {label: 'Bascule', ms: 260, pose: pose({torso: 40, neck: -16, leadHip: 34, leadKnee: 64, rearHip: 4, rearKnee: 54, leadShoulder: -40, rearShoulder: -40, leadElbow: 0, rearElbow: 0}), cue: 'Le buste plonge, les mains descendent.'},
+      {label: 'Sprawl', ms: 300, pose: pose({torso: 78, neck: -36, leadHip: -52, leadKnee: 0, leadAnkle: 48, rearHip: -56, rearKnee: 0, rearAnkle: 48, leadShoulder: -66, rearShoulder: -66, leadElbow: 10, rearElbow: 10}), cue: 'Jambes projetées en arrière, hanches vers le sol, tête haute.'},
+      {label: 'Remontée', ms: 520, pose: pose({torso: 40, neck: -16, leadHip: 34, leadKnee: 64, rearHip: 4, rearKnee: 54, leadShoulder: -40, rearShoulder: -40, leadElbow: 0, rearElbow: 0}), cue: 'Ramener les pieds sous soi.'},
+      {label: 'Garde', ms: 420, pose: pose({torso: 12, leadKnee: 28}), cue: 'Retour en garde basse.'}]}
 ];
 
 export const sequenceById = id => sequences.find(s => s.id === id);

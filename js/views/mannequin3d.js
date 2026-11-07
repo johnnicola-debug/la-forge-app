@@ -29,7 +29,7 @@ export function dimsFromState(state) {
 const VIEWS = {'Trois-quarts': [2.2, 1.35, 2.2], Profil: [0.25, 1.05, 3.1], Face: [3.1, 1.15, 0.05], Dessus: [0.25, 3.8, 0.3], 'Première personne': null, Adversaire: null};
 
 // `seqId` : identifiant d'une séquence du moteur, ou séquence composée (objet avec keys). `d3` : réglages 3D imposés (garde hybride).
-export async function mount3d(host, seqId, {muscles = [], glow = [], dims = bodyDims(), compact = false, d3 = null, transparent = false, height = null, loop = false, minimal = false} = {}) {
+export async function mount3d(host, seqId, {muscles = [], glow = [], dims = bodyDims(), compact = false, d3 = null, transparent = false, height = null, loop = false, minimal = false, opponent = false} = {}) {
   const THREE = await import('../../vendor/three/three.module.min.js');
   const {OrbitControls} = await import('../../vendor/three/OrbitControls.js');
   const seq = typeof seqId === 'object' ? seqId : sequenceById(seqId), keys = keyPositions(seq), H = dims.H;
@@ -107,10 +107,10 @@ export async function mount3d(host, seqId, {muscles = [], glow = [], dims = body
     for (const [m, k] of joints) m.position.copy(V(j[k]));
     const pel = V(j.pelvis), nb = V(j.neckBase), axis = nb.clone().sub(pel), T = axis.length();
     qTilt.setFromUnitVectors(up, axis.clone().normalize());
-    const yawT = (e.turn + e.chestTurn * 0.5 - 90) * Math.PI / 180; qYaw.setFromAxisAngle(up, yawT);
+    const yawT = ((e.face ?? 0) + e.turn + e.chestTurn * 0.5 - 90) * Math.PI / 180; qYaw.setFromAxisAngle(up, yawT);
     vols.torso.position.copy(pel); vols.torso.quaternion.copy(qTilt).multiply(qYaw); vols.torso.scale.set(1, T, 0.58);
     vols.chest.position.copy(pel.clone().lerp(nb, 0.74)); vols.chest.quaternion.copy(vols.torso.quaternion); vols.chest.scale.set(r(.088), r(.075), r(.062));
-    vols.pelvis.position.copy(pel); vols.pelvis.quaternion.copy(qTilt).multiply(qYaw.setFromAxisAngle(up, (e.turn - 90) * Math.PI / 180)); vols.pelvis.scale.set(r(.09), r(.06), r(.062));
+    vols.pelvis.position.copy(pel); vols.pelvis.quaternion.copy(qTilt).multiply(qYaw.setFromAxisAngle(up, ((e.face ?? 0) + e.turn - 90) * Math.PI / 180)); vols.pelvis.scale.set(r(.09), r(.06), r(.062));
     const hd = V(j.head), nk = hd.clone().sub(nb), nl = nk.length() * 0.55;
     vols.neck.position.copy(nb).addScaledVector(nk.clone().normalize(), nl / 2); vols.neck.quaternion.setFromUnitVectors(up, nk.normalize()); vols.neck.scale.set(1, nl, 1);
     vols.head.position.copy(hd); vols.head.quaternion.copy(vols.neck.quaternion); vols.head.scale.set(r(.058), r(.068), r(.054));
@@ -123,7 +123,11 @@ export async function mount3d(host, seqId, {muscles = [], glow = [], dims = body
   const main = makeFigure(matBody, false);
   const ghosts = compact ? [] : seq.keys.map(k => { const g = makeFigure(matGhost, true); pose(g, joints3d(k.pose, dims, extrasOf(seq, k.pose)), extrasOf(seq, k.pose)); return g; });
 
-  if (minimal) ghosts.forEach(g => { g.visible = false; });   // vue épurée (Creuset) : le geste seul, avec son équilibre
+  if (minimal) ghosts.forEach(g => { g.visible = false; });
+  if (opponent) {   // adversaire-cible : garde de boxe, face au pratiquant, à 1,6 m devant le point de départ
+    const guard = sequenceById('garde').keys[0].pose, op = {...guard, x: 1.6 / dims.unit, d3: {face: 180}};
+    pose(makeFigure(new THREE.MeshStandardMaterial({color: '#8a6a5e', transparent: true, opacity: 0.28, depthWrite: false}), true), joints3d(op, dims, extrasOf({}, op)), extrasOf({}, op));
+  }   // vue épurée (Creuset) : le geste seul, avec son équilibre
   // Centre de masse : sphère dorée, fil à plomb, polygone d'appui au sol (vert si le centre est au-dessus, rouge sinon).
   const comBall = new THREE.Mesh(new THREE.SphereGeometry(0.03, 16, 12), new THREE.MeshStandardMaterial({color: '#e2c27a', emissive: '#a07b2c', emissiveIntensity: 0.9}));
   const plumb = new THREE.Line(new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(), new THREE.Vector3()]), new THREE.LineDashedMaterial({color: '#e2c27a', dashSize: 0.03, gapSize: 0.03}));
@@ -134,11 +138,12 @@ export async function mount3d(host, seqId, {muscles = [], glow = [], dims = body
   const cue = $('.cue', host), scrub = $('[data-act=scrub]', host), playBtn = $('[data-act=play]', host);
   function update() {
     const s3 = sample3d(seq, st.u, samplePose), p = s3.pose, phase = s3.phase, extras = d3 ? {...s3.extras, ...d3} : s3.extras, j = joints3d(p, dims, extras);
-    st.j = j; pose(main, j, extras);
+    st.j = j; st.face = extras.face ?? 0; pose(main, j, extras);
     const c = centerOfMass3d(j), pg = supportPolygon(j, dims);
     comBall.position.set(c[0], c[1], c[2]);
     plumb.geometry.setFromPoints([comBall.position.clone(), new THREE.Vector3(c[0], 0.003, c[2])]); plumb.computeLineDistances();
-    poly.geometry.setFromPoints(pg.map(([x, z]) => new THREE.Vector3(x, 0.004, z)));
+    // Le nombre de points d'appui change (pied levé, mains au sol) : nouvelle géométrie à chaque image.
+    poly.geometry.dispose(); poly.geometry = new THREE.BufferGeometry().setFromPoints(pg.map(([x, z]) => new THREE.Vector3(x, 0.004, z)));
     polyMat.color.set(insideMargin(pg, [c[0], c[2]]) >= 0 ? '#5fc39b' : '#e0674c');
     if (compact) return;
     host.querySelectorAll('[data-key]').forEach(b => b.setAttribute('aria-pressed', String(Number(b.dataset.key) === phase)));
@@ -149,7 +154,8 @@ export async function mount3d(host, seqId, {muscles = [], glow = [], dims = body
   function follow() {
     const j = st.j; if (!j) return;
     if (st.view === 'Première personne') {
-      const hd = j.head; camera.position.set(hd[0] + 0.1, hd[1] + 0.02, hd[2]); camera.lookAt(hd[0] + 2, hd[1] - 0.45, hd[2] * 0.3);
+      const hd = j.head, a = (st.face ?? 0) * Math.PI / 180, fx = Math.cos(a), fz = -Math.sin(a);
+      camera.position.set(hd[0] + 0.1 * fx, hd[1] + 0.02, hd[2] + 0.1 * fz); camera.lookAt(hd[0] + 2 * fx, hd[1] - 0.45, hd[2] + 2 * fz);
     } else if (st.view === 'Adversaire') {
       camera.position.set(j.pelvis[0] + 2.3, 1.62 * H / 1.75, 0.15); camera.lookAt(j.pelvis[0], 1.05 * H / 1.75, 0);
     }
@@ -157,7 +163,9 @@ export async function mount3d(host, seqId, {muscles = [], glow = [], dims = body
   const setView = v => {
     st.view = v; const fixed = VIEWS[v];
     controls.enabled = Boolean(fixed); main.userData.vols.head.visible = main.userData.vols.neck.visible = v !== 'Première personne';
-    if (fixed) { camera.position.set(...fixed.map((x, i) => i === 1 ? x * H / 1.75 : x)); controls.target.set(0.15, 0.95 * H / 1.75, 0); controls.update(); } else follow();
+    // Avec un adversaire, la caméra se recule et vise entre les deux corps.
+    const cx = opponent ? 0.8 : 0.15, k = opponent ? 1.35 : 1;
+    if (fixed) { camera.position.set(...fixed.map((x, i) => i === 1 ? x * H / 1.75 : i === 0 ? cx + (x - 0.15) * k : x * k)); controls.target.set(cx, 0.95 * H / 1.75, 0); controls.update(); } else follow();
     host.querySelectorAll('[data-view]').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.view === v)));
   };
   if (transparent) { camera.position.set(1.4, 1.1, 6.2); controls.target.set(0.45, 0.88 * H / 1.75, 0); controls.enabled = false; camera.lookAt(controls.target); }

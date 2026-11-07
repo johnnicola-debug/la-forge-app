@@ -10,12 +10,13 @@ import {SEGMENT_MASS} from './skeleton.js';
 export const FRACTIONS = {torso: 0.29, neck: 0.05, head: 0.075, shoulderSep: 0.2, hipSep: 0.1,
   upperArm: 0.186, forearm: 0.146, fist: 0.04, thigh: 0.245, shin: 0.246, ankleH: 0.039, footFwd: 0.12, heelBack: 0.032, footHalfW: 0.025};
 
-// Réglages 3D par style de garde (degrés). turn : rotation des hanches (0 = de face, 90 = complètement de profil).
+// Réglages 3D par style de garde (degrés). face : orientation de tout le corps (0 = vers la cible, 180 = dos tourné, 360 = tour complet) ;
+// turn : rotation des hanches (0 = de face, 90 = complètement de profil).
 export const PRESETS = {
-  boxe:    {turn: 28, chestTurn: 6,  leadAbd: 4, rearAbd: 7, leadFootOut: 18, rearFootOut: 45, leadArmAbd: 8, rearArmAbd: 14},
-  escrime: {turn: 68, chestTurn: 8,  leadAbd: 0, rearAbd: 2, leadFootOut: 0,  rearFootOut: 85, leadArmAbd: 4, rearArmAbd: 30},
-  karate:  {turn: 30, chestTurn: 0,  leadAbd: 5, rearAbd: 8, leadFootOut: 8,  rearFootOut: 30, leadArmAbd: 6, rearArmAbd: 18},
-  carre:   {turn: 12, chestTurn: 0,  leadAbd: 6, rearAbd: 8, leadFootOut: 15, rearFootOut: 30, leadArmAbd: 10, rearArmAbd: 12}
+  boxe:    {face: 0, turn: 28, chestTurn: 6,  leadAbd: 4, rearAbd: 7, leadFootOut: 18, rearFootOut: 45, leadArmAbd: 8, rearArmAbd: 14},
+  escrime: {face: 0, turn: 68, chestTurn: 8,  leadAbd: 0, rearAbd: 2, leadFootOut: 0,  rearFootOut: 85, leadArmAbd: 4, rearArmAbd: 30},
+  karate:  {face: 0, turn: 30, chestTurn: 0,  leadAbd: 5, rearAbd: 8, leadFootOut: 8,  rearFootOut: 30, leadArmAbd: 6, rearArmAbd: 18},
+  carre:   {face: 0, turn: 12, chestTurn: 0,  leadAbd: 6, rearAbd: 8, leadFootOut: 15, rearFootOut: 30, leadArmAbd: 10, rearArmAbd: 12}
 };
 export const D3_KEYS = Object.keys(PRESETS.boxe);
 
@@ -63,7 +64,11 @@ export function joints3d(pose, dims = bodyDims(), extras = PRESETS.boxe) {
     Object.assign(j, {[side + 'Shoulder']: sh, [side + 'Elbow']: elbow, [side + 'Wrist']: wrist, [side + 'Hip']: hip,
       [side + 'Knee']: knee, [side + 'Ankle']: ankle, [side + 'Toe']: toe, [side + 'Heel']: heel, [side + 'FootDir']: flat});
   }
-  const low = Math.min(j.leadHeel[1], j.rearHeel[1], j.leadToe[1], j.rearToe[1]);
+  // Rotation de tout le corps autour de l'axe vertical du bassin (voltes, techniques retournées).
+  if (e.face) for (const k in j) { const p = j[k]; if (k.endsWith('FootDir')) j[k] = rotY(p, e.face); else { const r = rotY([p[0] - pelvis[0], p[1], p[2]], e.face); j[k] = [pelvis[0] + r[0], r[1], r[2]]; } }
+  // Appui : le point le plus bas du corps touche le sol (pieds en général ; mains, genoux, dos ou tête dans le travail au sol).
+  const R = {head: d.head * 0.85, leadWrist: d.fist * 0.75, rearWrist: d.fist * 0.75, leadKnee: 0.035 * d.H, rearKnee: 0.035 * d.H, leadElbow: 0.027 * d.H, rearElbow: 0.027 * d.H, pelvis: 0.06 * d.H, chest: 0.07 * d.H};
+  const low = Math.min(j.leadHeel[1], j.rearHeel[1], j.leadToe[1], j.rearToe[1], ...Object.entries(R).map(([k, r]) => j[k][1] - r));
   const dy = -low + (pose.lift ?? 0) * d.unit;
   for (const k in j) if (!k.endsWith('FootDir')) j[k] = [j[k][0], j[k][1] + dy, j[k][2]];
   return j;
@@ -85,6 +90,8 @@ export function supportPolygon(j, dims = bodyDims(), tol = 0.04) {
     if (j[s + 'Heel'][1] <= tol) pts.push(add(j[s + 'Heel'], side, w * 0.7), add(j[s + 'Heel'], side, -w * 0.7));
     if (j[s + 'Toe'][1] <= tol) pts.push(add(j[s + 'Toe'], side, w), add(j[s + 'Toe'], side, -w));
   }
+  // Au sol, les mains et les genoux posés font aussi partie de la base d'appui.
+  for (const k of ['leadWrist', 'rearWrist', 'leadKnee', 'rearKnee']) if (j[k][1] <= tol + 0.04 * dims.H) pts.push(j[k]);
   return hull(pts.map(p => [p[0], p[2]]));
 }
 function hull(P) {

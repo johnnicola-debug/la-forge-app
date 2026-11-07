@@ -10,9 +10,10 @@ import {PRESETS, D3_KEYS, joints3d, bodyDims, extrasOf, centerOfMass3d, supportP
 export const ROLES = {
   'pas-glisse': ['move', 'boxe'], 'pas-arriere': ['exit', 'boxe'], 'changement-niveau': ['move', 'lutte'], 'escrime-garde': ['move', 'escrime'],
   'direct-avant': ['attack', 'boxe'], 'direct-arriere': ['attack', 'boxe'], 'coup-pied-avant': ['attack', 'boxe'], teep: ['attack', 'muay-thai'],
-  'gyaku-zuki': ['attack', 'karate'], 'escrime-fente': ['attack', 'escrime'], 'esquive-laterale': ['exit', 'boxe']
+  'gyaku-zuki': ['attack', 'karate'], 'escrime-fente': ['attack', 'escrime'], 'esquive-laterale': ['exit', 'boxe'],
+  crochet: ['attack', 'boxe'], 'coup-pied-retourne': ['attack', 'boxe'], 'escrime-parade-riposte': ['attack', 'escrime'], sprawl: ['exit', 'lutte']
 };
-export const BASE_NAMES = {'direct-avant': 'Direct', 'direct-arriere': 'Croisé', 'coup-pied-avant': 'Coup de pied', teep: 'Teep', 'gyaku-zuki': 'Gyaku', 'escrime-fente': 'Fente'};
+export const BASE_NAMES = {'direct-avant': 'Direct', 'direct-arriere': 'Croisé', 'coup-pied-avant': 'Coup de pied', teep: 'Teep', 'gyaku-zuki': 'Gyaku', 'escrime-fente': 'Fente', crochet: 'Crochet', 'coup-pied-retourne': 'Retourné', 'escrime-parade-riposte': 'Parade-riposte'};
 
 // Transformations. `traits` : pictogramme + mot court affichés sous l'animation (peu de texte, beaucoup de visuel).
 export const MUTATIONS = {
@@ -23,6 +24,7 @@ export const MUTATIONS = {
   lent: {icon: '◔', label: 'au ralenti', time: 1.7},
   inverse: {icon: '⇄', label: 'bras inversés', apply: k => { const a = k.pose.angles; [a.leadShoulder, a.rearShoulder] = [a.rearShoulder, a.leadShoulder]; [a.leadElbow, a.rearElbow] = [a.rearElbow, a.leadElbow]; }},
   feinte: {icon: '◐', label: 'après feinte', structural: true},
+  volte: {icon: '↺', label: 'après une volte', structural: true},
   hybride: {icon: '✦', label: 'garde hybride', style: true}
 };
 
@@ -87,15 +89,15 @@ export function generate({seed = Math.floor(Math.random() * 2 ** 30), sequences,
 // Assemblage : comme un enchaînement animé, avec les transformations appliquées aux clés d'action de l'attaque principale.
 function build(recipe, byId, hybridStyle) {
   const keys = [];
-  let offset = 0;
+  let offset = 0, turned = 0;   // turned : tours déjà faits, pour que la suite ne « dévisse » pas en sens inverse
   const style0 = byId[recipe[0].id].style ?? 'boxe';
   for (const [n, part] of recipe.entries()) {
     const src = byId[part.id], style = PRESETS[(part.main && hybridStyle) || src.style || 'boxe'];
     let ks = clone(src.keys).map(k => ({...k, pose: {...k.pose, d3: {...style, ...k.pose.d3}}}));
     if (part.main) ks = transform(ks, part.muts ?? [], src);
-    if (n) offset = keys.at(-1).pose.x - (ks[0].pose.x ?? 0);
+    if (n) { offset = keys.at(-1).pose.x - (ks[0].pose.x ?? 0); turned = keys.at(-1).pose.d3.face ?? 0; }
     ks.forEach((k, i) => {
-      const pose = {...k.pose, x: (k.pose.x ?? 0) + offset};
+      const pose = {...k.pose, x: (k.pose.x ?? 0) + offset, d3: {...k.pose.d3, face: (k.pose.d3.face ?? 0) + turned}};
       keys.push(n && i === 0 ? {label: '→', ms: 420, pose} : {label: k.label, ms: i ? k.ms : undefined, cue: k.cue, pose});
     });
   }
@@ -104,12 +106,14 @@ function build(recipe, byId, hybridStyle) {
 }
 
 function transform(ks, muts, src) {
-  const kick = /pied|teep/.test(src.id), kickLeg = 'lead', mid = ks.slice(1, -1);
+  const kick = /pied|teep/.test(src.id), kickLeg = /retourne/.test(src.id) ? 'rear' : 'lead', mid = ks.slice(1, -1);
   for (const m of muts) {
     const M = MUTATIONS[m];
     if (M.apply) for (const k of mid) { M.apply(k, {kick, kickLeg}); clampAngles(k.pose.angles); }
     if (M.time) for (const k of ks.slice(1)) k.ms = Math.round(k.ms * M.time);
   }
+  // Volte : un tour complet sur soi pendant la première phase de l'action (tout le corps tourne de 360°).
+  if (muts.includes('volte')) for (const k of ks.slice(1)) k.pose.d3 = {...k.pose.d3, face: (k.pose.d3.face ?? 0) + 360};
   if (muts.includes('feinte') && ks.length >= 3) {
     // Feinte : esquisse de l'action (à mi-chemin), retour vers la garde, puis l'action réelle.
     const half = clone(ks[1]), a0 = ks[0].pose.angles;

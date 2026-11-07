@@ -46,7 +46,11 @@ export function computeJoints(pose, ground = 280) {
     Object.assign(j, {[side + 'Shoulder']: sh, [side + 'Elbow']: elbow, [side + 'Wrist']: wrist,
       [side + 'Hip']: hip, [side + 'Knee']: knee, [side + 'Ankle']: ankle, [side + 'Toe']: toe});
   }
-  const lowest = Math.max(j.leadAnkle[1] + 5, j.rearAnkle[1] + 5, j.leadToe[1], j.rearToe[1]);
+  const face = Math.cos((pose.d3?.face ?? 0) * Math.PI / 180);
+  if (face !== 1) for (const k in j) j[k] = [pelvis[0] + (j[k][0] - pelvis[0]) * face, j[k][1]];
+  // Point le plus bas du corps (rayon approximatif de chaque partie) : pieds en général, mains, genoux, dos ou tête au sol.
+  const lowest = Math.max(j.leadAnkle[1] + 5, j.rearAnkle[1] + 5, j.leadToe[1], j.rearToe[1], j.head[1] + 15, j.leadWrist[1] + 5, j.rearWrist[1] + 5,
+    j.leadKnee[1] + 6, j.rearKnee[1] + 6, j.leadElbow[1] + 5, j.rearElbow[1] + 5, j.pelvis[1] + 12, j.chest[1] + 14);
   const dy = ground - lowest - (pose.lift ?? 0);
   for (const k in j) j[k] = [j[k][0], j[k][1] + dy];
   return j;
@@ -59,7 +63,9 @@ export function interpolatePose(p, q, t) {
   const s = smooth(Math.min(1, Math.max(0, t)));
   const angles = {};
   for (const k of ANGLE_KEYS) angles[k] = lerp(p.angles[k] ?? 0, q.angles[k] ?? 0, s);
-  return {x: lerp(p.x ?? 0, q.x ?? 0, s), lift: lerp(p.lift ?? 0, q.lift ?? 0, s), angles};
+  const out = {x: lerp(p.x ?? 0, q.x ?? 0, s), lift: lerp(p.lift ?? 0, q.lift ?? 0, s), angles};
+  if (p.d3?.face !== undefined || q.d3?.face !== undefined) out.d3 = {face: lerp(p.d3?.face ?? 0, q.d3?.face ?? 0, s)};   // rotation complète (vue 2D)
+  return out;
 }
 
 // Durée totale d'une séquence (ms) : chaque clé indique le temps pour l'atteindre depuis la précédente.

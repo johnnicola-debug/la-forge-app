@@ -61,7 +61,7 @@ export function render(ctx, app, [base]) {
   const host = $('#cr-stage');
   import('./mannequin3d.js').then(async m => {
     if (!m.webglAvailable()) { host.innerHTML = `<div class="cr-2d">${thumb(g)}</div>`; return; }
-    const stop = await m.mount3d(host, g.sequence, {dims: m.dimsFromState(ctx.state), loop: true, minimal: true});
+    const stop = await m.mount3d(host, g.sequence, {dims: m.dimsFromState(ctx.state), loop: true, minimal: true, opponent: true});
     if (host.isConnected) ctx.cleanup.push(stop); else stop();
   }).catch(() => { host.innerHTML = `<div class="cr-2d">${thumb(g)}</div>`; });
 }

@@ -10,7 +10,7 @@ import {$, esc, page, notify} from '../ui.js';
 
 export const ANGLE_LABELS = {torso: 'Inclinaison du buste', neck: 'Tête (flexion)', leadShoulder: 'Épaule avant', leadElbow: 'Coude avant', rearShoulder: 'Épaule arrière',
   rearElbow: 'Coude arrière', leadHip: 'Hanche avant', leadKnee: 'Genou avant', leadAnkle: 'Cheville avant', rearHip: 'Hanche arrière', rearKnee: 'Genou arrière', rearAnkle: 'Cheville arrière'};
-const D3_LABELS = {turn: 'Rotation des hanches', chestTurn: 'Rotation des épaules', leadAbd: 'Écart jambe avant', rearAbd: 'Écart jambe arrière',
+const D3_LABELS = {face: 'Orientation du corps (tour)', turn: 'Rotation des hanches', chestTurn: 'Rotation des épaules', leadAbd: 'Écart jambe avant', rearAbd: 'Écart jambe arrière',
   leadFootOut: 'Pied avant ouvert', rearFootOut: 'Pied arrière ouvert', leadArmAbd: 'Bras avant écarté', rearArmAbd: 'Bras arrière écarté'};
 const STYLES = {boxe: 'Garde de boxe', escrime: 'Garde d’escrime', karate: 'Garde de karaté', carre: 'Garde carrée'};
 const clone = o => JSON.parse(JSON.stringify(o));
@@ -56,7 +56,7 @@ export function render(ctx, app, m, gid) {
       <h3>Profil (angles en degrés)</h3><div class="gsliders">${ANGLE_KEYS.map(a => slider(a, ANGLE_LABELS[a], pose.angles[a], -180, 180, 'angle')).join('')}
         <label class="gslider">Avancée du bassin <output>${Math.round(pose.x ?? 0)}</output><input type="range" min="-80" max="160" value="${Math.round(pose.x ?? 0)}" data-pos="x"></label>
         <label class="gslider">Saut (hauteur) <output>${Math.round(pose.lift ?? 0)}</output><input type="range" min="0" max="80" value="${Math.round(pose.lift ?? 0)}" data-pos="lift"></label></div>
-      <h3>Corps en 3D</h3><div class="gsliders">${D3_KEYS.map(k => slider(k, D3_LABELS[k], ex[k], k.includes('Turn') || k === 'turn' ? -90 : -30, 90, 'd3')).join('')}</div>
+      <h3>Corps en 3D</h3><div class="gsliders">${D3_KEYS.map(k => slider(k, D3_LABELS[k], ex[k], k === 'face' ? -180 : k.includes('Turn') || k === 'turn' ? -90 : -30, k === 'face' ? 360 : 90, 'd3')).join('')}</div>
       <div class="actions"><button class="primary" data-act="save">Enregistrer le geste</button><a class="button" href="#atelier/${m.id}">Retour à la méthode</a>
         ${existing ? '<button class="danger" data-act="delete">Supprimer le geste</button>' : ''}</div>
       <p class="subtle">Les poses sont des illustrations : l’application ne vérifie ni les amplitudes articulaires ni la sécurité d’un geste.</p>
