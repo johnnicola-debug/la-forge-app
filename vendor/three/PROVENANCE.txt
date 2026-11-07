@@ -1,0 +1,2 @@
+three.js 0.170.0 (MIT) — npm registry, intégrité sha512-FQK+LEpYc0fBD+J8g6oSEyyNzjp+Q7Ks1C568WWaoMRLW+TkNNWmenWeGgJjV105Gd+p/2ql1ZcjYvNiPZBhuQ==
+Fichiers : build/three.module.min.js, examples/jsm/controls/OrbitControls.js (import réécrit vers le fichier local).

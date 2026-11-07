@@ -1,0 +1,180 @@
+/* LA FORGE 0.3 — styles des espaces : seuil, orientation, reflet, forge de style. */
+
+/* ——— Le seuil ——— */
+.seuil { position: relative; border-radius: 8px; overflow: hidden; margin: 10px 0 18px; min-height: 420px; border: 1px solid var(--line); }
+.seuil-art { position: absolute; inset: 0; width: 100%; height: 100%; }
+.seuil-art .lay { transition: transform .8s var(--ease); }
+.seuil:hover .l1 { transform: translateX(-6px); } .seuil:hover .l2 { transform: translateX(-12px); } .seuil:hover .l3 { transform: translateX(-18px); }
+.seuil-text { position: relative; max-width: 520px; padding: 46px clamp(18px, 4vw, 48px); color: #ece8dd; }
+.seuil-text h1 { color: #f4f1e8; font-size: clamp(2.2rem, 4.6vw, 3.8rem); }
+.seuil-text .intro { color: #d4d8d2; }
+.seuil-text .kicker { color: #d8b25e; }
+.seuil-text .kicker::after { background: #d8b25e; }
+.rec { display: grid; grid-template-columns: 1fr auto; gap: 12px; align-items: center; padding: 10px 0; border-bottom: 1px solid var(--line-2); }
+.rec p { margin: 2px 0 0; font-size: .88rem; }
+.rec .button { white-space: nowrap; }
+.branch-bars { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 12px; }
+.bb { text-decoration: none; color: var(--ink); display: flex; flex-direction: column; gap: 4px; }
+.bb .bar { height: 4px; background: var(--line-2); border-radius: 2px; overflow: hidden; }
+.bb .bar i { display: block; height: 100%; width: 0; background: var(--jade); transition: width 1s var(--ease); }
+.bb small { color: var(--slate); }
+.voie-tile { text-decoration: none; color: var(--ink); text-align: center; transition: transform .25s var(--ease), border-color .25s; }
+.voie-tile:hover { transform: translateY(-3px); border-color: var(--gold); }
+
+/* ——— Orientation ——— */
+.orient { max-width: 760px; margin: 2vh auto 0; text-align: center; }
+.orient-progress { display: flex; justify-content: center; gap: 6px; margin: 8px 0 26px; }
+.orient-progress i { width: 22px; height: 3px; background: var(--line); border-radius: 2px; transition: background .3s; }
+.orient-progress i.done { background: var(--jade); } .orient-progress i.now { background: var(--gold); }
+.orient-card { animation: rise .5s var(--ease) both; }
+.orient-card h1 { font-size: clamp(1.7rem, 3.6vw, 2.6rem); }
+.orient .kicker { justify-content: center; color: var(--gold); }
+.orient .kicker::after { display: none; }
+.choices { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 10px; margin: 22px 0 8px; text-align: left; }
+.choice { justify-content: flex-start; min-height: 58px; padding: 12px 16px; font-size: 1rem; border-color: var(--line-strong) !important; background: rgba(255,255,255,.02) !important;
+  transition: border-color .2s, background .2s, transform .2s var(--ease); }
+.choice:hover { border-color: var(--gold) !important; transform: translateY(-2px); }
+.choice[aria-pressed="true"] { border-color: var(--jade) !important; background: var(--jade-soft) !important; color: var(--ink); }
+.choice[aria-pressed="true"]::before { content: "✓"; color: var(--jade); margin-right: 4px; }
+.orient .actions { justify-content: center; }
+.orient-live { display: flex; justify-content: center; gap: 24px; margin: 28px 0 6px; }
+.live-voie { display: flex; flex-direction: column; align-items: center; color: var(--slate); font-size: .75rem; }
+.live-voie .sigil { transition: opacity .4s; }
+.center { text-align: center; }
+.hero.reveal h1 { font-size: clamp(2rem, 4.4vw, 3.4rem); }
+.voies-reveal { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 16px; margin: 16px 0; }
+.voie-card { text-align: center; animation: rise .7s var(--ease) both; }
+.voie-card:nth-child(2) { animation-delay: .15s; } .voie-card:nth-child(3) { animation-delay: .3s; }
+.voie-card.main { border-color: var(--gold); box-shadow: 0 0 0 1px var(--gold), 0 18px 60px rgba(216,178,94,.12); }
+.voie-card details { text-align: left; }
+.aff { height: 4px; background: var(--line-2); border-radius: 2px; overflow: hidden; margin: 8px 0 12px; }
+.aff i { display: block; height: 100%; width: 0; background: linear-gradient(90deg, var(--jade), var(--gold)); transition: width 1.2s var(--ease); }
+
+/* ——— Mon reflet ——— */
+.sheet { display: grid; grid-template-columns: minmax(280px, 380px) minmax(0, 1fr); gap: 18px; margin-top: 12px; align-items: start; }
+.sheet-id { display: grid; grid-template-columns: 1fr; text-align: left; position: sticky; top: 12px; }
+.sheet-id h1 { font-size: clamp(1.7rem, 3vw, 2.4rem); margin: .1em 0 .3em; }
+svg.reflet { width: 62%; max-width: 220px; margin: 0 auto 6px; display: block; }
+.reflet .body-base path, .reflet .body-base ellipse { fill: #1d2729; stroke: #3a4749; stroke-width: 1; }
+.reflet .zone { fill: none; stroke: #3a4749; stroke-width: 3; opacity: .55; transition: all .6s var(--ease); }
+.reflet circle.zone { fill: #2a3436; }
+.reflet .zone.on { stroke: var(--glow); opacity: 1; filter: drop-shadow(0 0 6px rgba(109,184,160,.7)); }
+.reflet circle.zone.on { fill: var(--glow); }
+.inline-form { display: flex; gap: 6px; margin-bottom: 10px; }
+.inline-form input { margin: 0; }
+.voies-mini { display: flex; gap: 14px; margin: 8px 0 12px; }
+.voies-mini div { display: flex; flex-direction: column; align-items: center; font-size: .72rem; color: var(--slate); }
+.sheet-stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 14px; }
+.stat-cat { padding: 16px 18px; }
+.stat-cat.has { border-color: rgba(109,184,160,.45); }
+.stat-cat.flash { animation: flash 1.4s var(--ease) 1; }
+@keyframes flash { 0% { box-shadow: 0 0 0 2px var(--gold), 0 0 40px rgba(216,178,94,.45); } 100% { box-shadow: var(--shadow); } }
+.stat { display: grid; grid-template-columns: 1fr auto auto; gap: 8px; align-items: center; padding: 7px 0; border-bottom: 1px solid var(--line-2); }
+.stat span { display: block; font-size: .84rem; color: var(--ink-2); }
+.stat strong { display: block; font-size: 1.05rem; font-family: var(--serif); }
+.stat small { display: block; font-size: .72rem; color: var(--slate); }
+.stat em { color: var(--slate); font-size: .82rem; }
+button.small, .button.small { padding: 3px 10px; font-size: .78rem; }
+.origin { white-space: nowrap; }
+.origin.o-verifiee { color: var(--gold); } .origin.o-mesuree { color: var(--jade); } .origin.o-estimee { color: var(--verm); }
+svg.spark { width: 80px; height: 22px; }
+svg.spark polyline { fill: none; stroke: var(--jade); stroke-width: 1.6; }
+.add-form { margin-top: 16px; border-color: var(--gold); }
+
+/* ——— Forge de style ——— */
+.pair { display: flex; flex-wrap: wrap; gap: 14px; align-items: flex-end; }
+.pair label { flex: 1 1 200px; margin: 0; }
+.pair p { flex-basis: 100%; margin: 0; }
+.facets { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 6px 18px; margin-bottom: 12px; }
+.facet { display: grid; grid-template-columns: 1.3fr auto auto auto; gap: 8px; align-items: center; font-size: .88rem; padding: 4px 0; border-bottom: 1px dashed var(--line-2); }
+.facet b { font-weight: 500; color: var(--gold); letter-spacing: .05em; } .facet i { color: var(--slate); font-style: normal; }
+.tf-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 16px; margin: 16px 0; }
+ul.tf { list-style: none; padding: 0; margin: 0; }
+.tf-item { padding: 10px 0 10px 12px; border-left: 2px solid var(--line); margin-bottom: 8px; }
+.tf-item p { margin: 4px 0; font-size: .9rem; }
+.tf-transfer { border-left-color: var(--jade); } .tf-adapt { border-left-color: var(--gold); } .tf-risk { border-left-color: var(--verm); } .tf-build { border-left-color: var(--line-strong); }
+.tf-head { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.tf-head a { font-weight: 600; color: var(--ink); }
+.rel { font-size: .68rem; letter-spacing: .08em; text-transform: uppercase; padding: 1px 7px; border-radius: 99px; border: 1px solid currentColor; }
+.rel.r-etabli { color: var(--jade); } .rel.r-plausible { color: var(--gold); } .rel.r-experimental { color: var(--verm); }
+.srcs { display: block; color: var(--slate); font-size: .76rem; }
+.srcs a { color: var(--slate); }
+ol.phases { padding-left: 1.2em; } ol.phases li { margin-bottom: 14px; }
+ol.phases h3 { margin-top: 4px; }
+
+@media (max-width: 900px) { .sheet { grid-template-columns: 1fr; } .sheet-id { position: static; } }
+@media (max-width: 760px) { .seuil { min-height: 520px; } .seuil-art { opacity: .75; } .seuil-text { padding-top: 26px; background: linear-gradient(180deg, rgba(12,17,18,.82) 60%, rgba(12,17,18,0)); } .rec { grid-template-columns: 1fr; } .facet { grid-template-columns: 1fr auto auto auto; } }
+
+/* ——— Bibliothèque v2, mannequin 3D ——— */
+.view-switch { display: inline-flex; border: 1px solid var(--line-strong); border-radius: 99px; padding: 3px; margin: 6px 0 10px; }
+.view-switch button { border: 0; border-radius: 99px; padding: 5px 14px; background: none; font-size: .84rem; }
+.view-switch button[aria-selected="true"] { background: var(--ink); color: var(--paper); }
+.m3d { border: 1px solid var(--line); border-radius: var(--radius); overflow: hidden; background: #0f1517; color: var(--ink); }
+.m3d-canvas canvas { display: block; width: 100%; touch-action: none; }
+.m3d .views button { padding: 4px 9px; font-size: .78rem; }
+ul.sources { list-style: none; padding: 0; } ul.sources li { margin: 6px 0; font-size: .9rem; }
+.lib-list details { margin: 4px 0 8px; } .lib-list details label { margin: 6px 0; font-size: .8rem; }
+button.chip { cursor: pointer; background: none; }
+
+.guards figure { margin: 0; } .guards figcaption { text-align: center; font-family: var(--serif); margin-top: 6px; }
+
+/* Sous-onglets (Mon reflet : personnage / profil). */
+.subtabs { display: flex; gap: 4px; flex-wrap: wrap; margin: 0 0 14px; border-bottom: 1px solid var(--line); }
+.subtabs a { padding: 8px 14px; text-decoration: none; color: inherit; opacity: .75; border-bottom: 2px solid transparent; margin-bottom: -1px; }
+.subtabs a[aria-current="page"] { opacity: 1; border-bottom-color: var(--gold, currentColor); font-weight: 600; }
+.way h3 { font-size: .78rem; letter-spacing: .12em; text-transform: uppercase; font-family: var(--sans); margin: 14px 0 4px; }
+
+/* Corps d'ombre 3D. */
+.m3d-canvas canvas { display: block; width: 100%; border-radius: var(--radius); background: #0b1113; touch-action: none; }
+.m3d .views button[aria-pressed="true"] { outline: 1px solid var(--gold); }
+.m3d-note { font-size: .85rem; }
+.reflet-3d { min-width: 0; }
+.m3d.compact .m3d-canvas canvas { background: transparent; }
+
+/* Forge : créer un style. */
+.mix { display: grid; gap: 6px; }
+.mix-row { display: grid; grid-template-columns: auto minmax(0, 1fr) minmax(90px, 2fr) 3.5em; gap: 10px; align-items: center; opacity: .7; }
+.mix-row.on { opacity: 1; }
+.mix-row output { font-variant-numeric: tabular-nums; text-align: right; }
+.hy-3d { min-height: 240px; }
+.hy-facet { display: grid; grid-template-columns: minmax(0, 11em) minmax(0, 1fr); gap: 10px; padding: 6px 0; border-bottom: 1px solid var(--line-2); }
+.hy-choice { display: grid; gap: 4px; }
+.hy-path li { margin: 4px 0; }
+@media (max-width: 560px) { .hy-facet { grid-template-columns: 1fr; gap: 2px; } }
+
+/* Atelier : arbre de la méthode, séance, import. */
+.mtree { display: flex; gap: 14px; overflow-x: auto; padding-bottom: 6px; }
+.mcol { flex: 0 0 min(240px, 78vw); display: grid; gap: 8px; align-content: start; }
+.mcol h3 { font: 600 .75rem var(--sans); letter-spacing: .14em; text-transform: uppercase; margin: 0; opacity: .8; }
+.mnode { border: 1px solid var(--line-strong); border-left-width: 3px; border-radius: var(--radius); padding: 8px 10px; display: grid; gap: 4px; }
+.mnode.st-retenu { border-left-color: var(--jade-2); } .mnode.st-en-travail { border-left-color: var(--gold); } .mnode.st-ecarte { opacity: .5; }
+.mnode .after { font-size: .8rem; } .mnode select { max-width: 100%; }
+.msession li { margin: 8px 0; }
+.file-in { display: grid; gap: 4px; margin-top: 12px; font-size: .9rem; }
+
+/* Rangs F à S. */
+.grade { display: inline-flex; align-items: baseline; gap: 3px; margin-left: 8px; padding: 0 7px; border-radius: 3px; font: 700 .85rem var(--sans); border: 1px solid currentColor; }
+.grade small { font-weight: 500; opacity: .75; font-size: .72rem; }
+.g-S { color: #c9a95c; } .g-A { color: #4f8f7c; } .g-B { color: #2b6455; } .g-C { color: var(--ink-2); } .g-D, .g-E { color: #a8692c; } .g-F { color: var(--verm); }
+.grade-miss { display: block; font-size: .78rem; opacity: .8; }
+
+/* Accueil : corps d'ombre 3D posé sur le paysage. */
+.seuil-3d { position: absolute; right: 0; bottom: 0; width: min(46%, 520px); height: 100%; pointer-events: none; opacity: 0; transition: opacity 1.2s ease; }
+.seuil-3d.on { opacity: 1; }
+.seuil-3d .m3d-canvas canvas { background: transparent; }
+@media (max-width: 760px) { .seuil-3d { width: 100%; opacity: .0; } .seuil-3d.on { opacity: .55; } }
+.seuil-3d .m3d { background: transparent; border: 0; padding: 0; margin: 0; box-shadow: none; }
+/* Halo lunaire derrière le corps d’ombre : la silhouette noire se détache comme dans un combat d’ombres. */
+.seuil-3d.on { background: radial-gradient(circle at 52% 42%, rgba(236,196,170,.62) 0, rgba(201,150,128,.32) 26%, rgba(120,90,80,.08) 46%, transparent 62%); }
+
+/* Éditeur de poses. */
+.gedit { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.1fr); gap: 16px; align-items: start; }
+.gview { position: sticky; top: 12px; --ink-fig: #e6dfcf; }
+.gpose { width: 100%; height: auto; max-height: 340px; }
+.gbal { font-weight: 600; } .gbal.ok { color: #5fc39b; } .gbal.juste { color: #d8b25e; } .gbal.non { color: #f0735a; }
+.gkeys { display: flex; flex-wrap: wrap; gap: 6px; margin: 8px 0; } .gkeys [aria-pressed="true"] { outline: 1px solid var(--gold); }
+.gsliders { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 6px 14px; }
+.gslider { display: grid; grid-template-columns: 1fr auto; gap: 2px 8px; font-size: .85rem; } .gslider input { grid-column: 1 / -1; width: 100%; }
+.gslider output { font-variant-numeric: tabular-nums; opacity: .8; }
+.gestures { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin: 12px 0; } .gestures h3 { width: 100%; margin: 0; }
+@media (max-width: 860px) { .gedit { grid-template-columns: 1fr; } .gview { position: static; } }

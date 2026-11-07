@@ -1,0 +1,17 @@
+{
+  "name": "LA FORGE — Dojo numérique",
+  "short_name": "LA FORGE",
+  "description": "Entraîner son corps, comprendre la pratique martiale et forger son propre style. Fonctionne hors ligne ; les données restent sur l'appareil.",
+  "lang": "fr",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#0c1112",
+  "theme_color": "#0c1112",
+  "icons": [
+    {"src": "icons/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any"},
+    {"src": "icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any"},
+    {"src": "icons/icon-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable"}
+  ]
+}
