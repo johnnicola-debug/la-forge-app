@@ -83,7 +83,8 @@ export function render(ctx, app) {
     <section class="sheet-id panel">
       <div class="reflet-3d" id="reflet-3d">${silhouette(lit)}</div>
       <div class="id-text"><span class="kicker">Fiche de personnage</span><h1>${esc(p.name || 'Pratiquant·e sans nom')}<span class="dot">.</span></h1>
-        <form id="title-form" class="inline-form"><input name="title" maxlength="60" value="${esc(s.avatar.title)}" placeholder="Votre titre, ex. Escrimeur en reconversion" aria-label="Titre"><button>OK</button></form>
+        <form id="title-form" class="inline-form"><input name="title" maxlength="60" value="${esc(s.avatar.title)}" placeholder="Votre titre, ex. Escrimeur en reconversion" aria-label="Titre">
+          <select name="emblem" aria-label="Emblème">${[['cercle', o?.primary ? `Emblème de ma voie (${VOIES[o.primary].short})` : 'Emblème neutre'], ...VOIE_IDS.map(v => [v, `Emblème ${VOIES[v].short}`])].map(([k, l]) => `<option value="${k}" ${s.avatar.emblem === k ? 'selected' : ''}>${esc(l)}</option>`).join('')}</select><button>OK</button></form>
         <div class="voies-mini">${o ? VOIE_IDS.map(v => `<div title="${esc(VOIES[v].name)}">${sigil(v, 46, o.affinities[v])}<small>${esc(VOIES[v].short)}</small></div>`).join('') : '<a class="button primary" href="#orientation">Découvrir mes voies</a>'}</div>
         <dl class="kv"><dt>Expérience</dt><dd>${esc(EXPERIENCE[p.experience])}</dd>
           <dt>Disciplines</dt><dd>${p.disciplines.length ? p.disciplines.map(d => esc(d.name) + (d.years ? ` (${d.years} an${d.years > 1 ? 's' : ''})` : '')).join(', ') : '<span class="subtle">non renseignées</span>'}</dd>
@@ -116,7 +117,7 @@ export function render(ctx, app) {
       .then(stop => { if (host3d.isConnected) ctx.cleanup.push(stop); else stop(); }).catch(() => { host3d.innerHTML = silhouette(lit); });
   }
   app.querySelectorAll('[data-add]').forEach(b => b.onclick = () => { ctx.avatarAdd = b.dataset.add; ctx.render(); setTimeout(() => $('#add-form')?.scrollIntoView({behavior: 'smooth', block: 'center'}), 30); });
-  $('#title-form').onsubmit = e => { e.preventDefault(); s.avatar = {...s.avatar, title: String(new FormData(e.target).get('title')).trim().slice(0, 60)}; ctx.save(); notify('Titre enregistré.'); };
+  $('#title-form').onsubmit = e => { e.preventDefault(); const d = new FormData(e.target); s.avatar = {...s.avatar, title: String(d.get('title')).trim().slice(0, 60), emblem: String(d.get('emblem') || 'cercle').slice(0, 30)}; ctx.save(); notify('Titre et emblème enregistrés.'); };
   app.querySelectorAll('[data-del]').forEach(b => b.onclick = () => {
     if (!confirm('Supprimer cette valeur de votre historique ?')) return;
     const [kind, id] = b.dataset.del.split(':');

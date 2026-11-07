@@ -174,3 +174,11 @@ body.nuit .subtabs a[aria-current="page"] { background: transparent; }
 .sound-ctl { display: flex; gap: 6px; margin: 10px 0 6px; }
 .sound-ctl button { flex: 1; font-size: .78rem; padding: 4px 6px; opacity: .7; }
 .sound-ctl button[aria-pressed="true"] { opacity: 1; border-color: var(--gold); color: var(--gold); }
+
+/* Teinte de la voie (décorative) : Foudre vermillon, Racine jade, Vent or. */
+body { --voie: var(--verm); }
+body.voie-foudre { --voie: #f0735a; } body.voie-racine { --voie: #6db8a0; } body.voie-vent { --voie: #d8b25e; }
+body.nuit h1 .dot { color: var(--voie); }
+body.nuit nav a[aria-current="page"] { border-left-color: var(--voie); }
+body.voie-foudre .wm-place:hover .wm-glyph, body.voie-racine .wm-place:hover .wm-glyph, body.voie-vent .wm-place:hover .wm-glyph { stroke: var(--voie); }
+body.voie-foudre .hero .kicker::after, body.voie-racine .hero .kicker::after, body.voie-vent .hero .kicker::after { background: var(--voie); }

@@ -34,10 +34,14 @@ const ctx = {
 };
 if (loaded.issue === 'migre') ctx.save();
 
+// Ambiance de la voie : la voie principale (ou l'emblème choisi) donne la teinte d'accent, rien d'autre.
+export const accentVoie = s => ['foudre', 'racine', 'vent'].includes(s.avatar.emblem) ? s.avatar.emblem : s.orientation?.primary ?? null;
+
 function refreshMe() {
-  const s = ctx.state, o = s.orientation, me = $('#me');
+  const s = ctx.state, o = s.orientation, me = $('#me'), v = accentVoie(s);
+  for (const k of ['foudre', 'racine', 'vent']) document.body.classList.toggle('voie-' + k, v === k);
   if (!me) return;
-  me.innerHTML = `${o?.primary ? orientation.sigil(o.primary, 38, 1) : '<svg class="sigil" viewBox="0 0 40 40"><circle cx="20" cy="20" r="17" fill="none" stroke="currentColor" stroke-dasharray="3 4"/></svg>'}
+  me.innerHTML = `${v ? orientation.sigil(v, 38, 1) : '<svg class="sigil" viewBox="0 0 40 40"><circle cx="20" cy="20" r="17" fill="none" stroke="currentColor" stroke-dasharray="3 4"/></svg>'}
     <span><b>${esc(s.profile.name || 'Mon reflet')}</b><small>${o?.primary ? esc(VOIES[o.primary].name) : 'Orientation à faire'}${s.avatar.title ? ' · ' + esc(s.avatar.title) : ''}</small></span>`;
 }
 
