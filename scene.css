@@ -245,3 +245,30 @@ body.voie-foudre .hero .kicker::after, body.voie-racine .hero .kicker::after, bo
 .arena-result { display: grid; grid-template-columns: repeat(auto-fit, minmax(90px, 1fr)); gap: 8px; } .arena-result div { display: grid; }
 .arena-result b { font: 600 2rem/1.1 var(--serif); color: var(--voie, #d8b25e); font-variant-numeric: tabular-nums; } .arena-result span { font-size: .75rem; opacity: .7; }
 @media (max-width: 860px) { .arena-wrap { grid-template-columns: 1fr; } }
+
+/* Animations des exercices. */
+.inkloop { width: 100%; height: 100%; display: block; --ink-fig: #e6dfcf; } .ink-ground { stroke: rgba(255,255,255,.18); stroke-width: 2; }
+.run-visual { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 16px; align-items: center; }
+.ex-anim { position: relative; aspect-ratio: 4 / 3; max-height: 260px; border-radius: 8px; background: radial-gradient(circle at 50% 40%, rgba(216,178,94,.10), transparent 70%); }
+.approx { display: block; font-size: .72rem; opacity: .65; text-align: center; }
+.tatami .tt-stage { width: 100%; display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 2vw; align-items: center; justify-items: center; min-height: 0; }
+.tatami .tt-anim { width: 100%; height: min(42vh, 46vw); position: relative; } .tatami .tt-anim .inkloop { --ink-fig: #f1ece0; }
+.tatami .tt-anim[hidden] + .tt-clock { grid-column: 1 / -1; }
+.ex-stage { padding: 8px; } .ex-stage #ex-3d { min-height: 240px; }
+@media (max-width: 640px) { .run-visual { grid-template-columns: 1fr; } .tatami .tt-stage { grid-template-columns: 1fr; } .tatami .tt-anim { height: 24vh; } .tatami .tt-clock { width: min(52vw, 30vh); } }
+
+/* Carte du corps. */
+.bodymap { width: 100%; max-width: 420px; height: auto; display: block; }
+.bm-base { fill: rgba(230,223,207,.10); stroke: rgba(230,223,207,.25); stroke-width: 1; }
+.bm-cap { fill: #8d9896; font: 12px var(--sans); text-anchor: middle; letter-spacing: .1em; text-transform: uppercase; }
+.bm-zone ellipse { stroke: rgba(230,223,207,.18); stroke-width: 1; }
+.bodymap.interactive .bm-zone { cursor: pointer; } .bodymap.interactive .bm-zone:hover ellipse, .bodymap.interactive .bm-zone:focus-visible ellipse { stroke: #d8b25e; stroke-width: 2; }
+.bodymap.interactive .bm-zone:focus { outline: none; }
+.bm-wrap { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 14px; align-items: center; }
+.bm-legend { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; font-size: .85rem; } .bm-legend i { display: inline-block; width: 14px; height: 14px; border-radius: 50%; margin-right: 8px; vertical-align: -2px; }
+.bm-legend .l1 { background: rgba(216,178,94,.6); } .bm-legend .l2 { background: rgba(224,138,76,.8); } .bm-legend .l3 { background: rgba(224,80,60,.95); }
+.bm-warn, .bb-pain { color: #f0a08c; font-size: .9rem; }
+.body-board { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.2fr); gap: 18px; align-items: start; }
+.body-board figure { margin: 0; min-width: 0; } .body-board figcaption { font-size: .8rem; letter-spacing: .08em; text-transform: uppercase; opacity: .7; margin-bottom: 6px; }
+.bb-top { list-style: none; padding: 0; margin: 8px 0 0; display: grid; gap: 4px; } .bb-top i { display: inline-block; width: 12px; height: 12px; border-radius: 50%; margin-right: 8px; } .bb-top small { margin-left: 6px; opacity: .6; }
+@media (max-width: 760px) { .body-board, .bm-wrap { grid-template-columns: 1fr; } }

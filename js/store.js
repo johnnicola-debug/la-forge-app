@@ -1,6 +1,7 @@
 // État local version 2 : validation, migration depuis la v1, sauvegardes.
 // Rien n'est envoyé au serveur ; tout reste dans le navigateur (localStorage).
 
+import {validBody} from './engine/body.js';
 export const VERSION = 3;
 export const KEY = 'la-forge.v3', KEY_V2 = 'la-forge.v2', KEY_V1 = 'la-forge.v1', BACKUP_KEY = 'la-forge.copies';
 export const LIMIT = 1000;
@@ -49,7 +50,7 @@ export function validMeasurement(m) {
 function validSession(s) {
   return s && str(s.id, 80) && str(s.title, 120) && isDate(s.startedAt) && optDate(s.endedAt ?? null)
     && optNum(s.plannedMin, 0, 600) && optNum(s.activeSec ?? null, 0, 86400) && optNum(s.effort ?? null, 1, 10)
-    && ['terminee', 'arretee', 'importee-v1'].includes(s.status) && arr(s.blocks ?? [], 100) && str(s.notes ?? '', 1000);
+    && ['terminee', 'arretee', 'importee-v1'].includes(s.status) && arr(s.blocks ?? [], 100) && str(s.notes ?? '', 1000) && validBody(s.body);
 }
 
 // Geste créé dans l'éditeur de poses (mêmes règles que views/gesture.js, sans dépendre de la vue).

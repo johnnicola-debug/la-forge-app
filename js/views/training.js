@@ -7,6 +7,9 @@ import {fitTemplate, buildSteps, startRun, play, pause, next, previous, remainin
 import {$, esc, page, fmtDate, fmtClock, notify, landscape} from '../ui.js';
 import {still} from './movement.js';
 import {progressBoard} from './charts.js';
+import {motionFor, motions} from '../data/motions.js';
+import {mountInk} from './inkloop.js';
+import {bodyBoard, wireBodyInput} from './bodymap.js';
 
 export const byId = Object.fromEntries(exercises.map(e => [e.id, e]));
 const KIND = {preparation: 'Préparation', travail: 'Exercice', repos: 'Repos', 'retour-au-calme': 'Retour au calme'};
@@ -29,6 +32,7 @@ function overview(ctx, app, chosenGoal) {
   <section class="hero">${landscape()}<span class="kicker">Coaching</span><h1>S’entraîner pour pratiquer<span class="dot">.</span></h1>
   <p class="intro">Choisissez ce que vous voulez développer. LA FORGE explique quelles capacités sont travaillées, pourquoi, et comment s’y prendre.</p></section>
   ${progressBoard(s.sessions)}
+  ${bodyBoard(s.sessions)}
   <div class="train-quick"><a class="tile" href="#reaction"><b>◎</b><span>Arène de réaction</span><small>3 niveaux · leurres</small></a>
     <a class="tile" href="#inventer"><b>✧</b><span>Le Creuset</span><small>inventer une technique</small></a>${s.activeSession ? `<a class="tile hot" href="#entrainement/seance"><b>▶</b><span>Reprendre</span><small>séance en cours</small></a>` : ''}</div>
   ${s.activeSession ? `<div class="notice jade"><strong>Une séance est en cours :</strong> ${esc(s.activeSession.title)}. <a href="#entrainement/seance">Reprendre la séance</a></div>` : ''}
@@ -111,8 +115,9 @@ function runner(ctx, app) {
       <h1>${step.kind === 'repos' ? 'Repos' : esc(ex?.name ?? step.exerciseId)}</h1>
       ${step.kind === 'repos' ? `<p>Respirez, marchez tranquillement. Ensuite : <strong>${esc(byId[r.steps[r.index + 1]?.exerciseId]?.name ?? '')}</strong>.</p>`
         : `<p class="intro">${step.reps ? `<strong>${step.reps} répétitions</strong>` : ''}${step.durationSec && step.kind === 'travail' ? `<strong>${step.durationSec} secondes</strong>` : ''}</p>`}
+      <div class="run-visual"><div class="ex-anim" id="ex-anim"></div><div>
       <div class="clock ${step.kind === 'repos' ? 'rest' : ''}" id="clock">${rem !== null ? fmtClock(rem) : fmtClock(Math.floor(stepElapsed(r, Date.now()) / 1000))}</div>
-      <div class="ring"><i id="bar"></i></div>
+      <div class="ring"><i id="bar"></i></div></div></div>
       ${rem === null ? '<p class="subtle">Exercice en répétitions : prenez votre temps, le chronomètre indique seulement la durée écoulée.</p>' : ''}
       <div class="actions">
         <button id="play" class="primary">${r.running ? 'Pause' : r.stepMs || r.activeMs ? 'Reprendre' : 'Démarrer'}</button>
@@ -140,6 +145,7 @@ function runner(ctx, app) {
       bilan(ctx, app, pause(r, Date.now()), true);
     };
     $('#tatami').onclick = () => { ctx.tatami = true; keepAwake(); draw(); };
+    showMotion($('#ex-anim'), step);
     updateClock();
   };
   // ——— Mode mains libres (« tatami ») : lisible à 3 m, grandes zones tactiles, clavier, voix et écran gardé allumé ———
@@ -160,8 +166,8 @@ function runner(ctx, app) {
         <span><button id="tt-voice" aria-pressed="${ctx.tatamiVoice !== false}">♪ Voix</button><button id="tt-exit" aria-label="Quitter le mode mains libres">✕</button></span></div>
       <h1 class="tt-name">${step.kind === 'repos' ? 'Repos' : esc(ex?.name ?? step.exerciseId)}</h1>
       ${step.kind === 'travail' ? `<div class="tt-sets">${Array.from({length: step.sets}, (_, i) => `<i class="${i < step.set - 1 ? 'done' : i === step.set - 1 ? 'now' : ''}"></i>`).join('')}</div>` : '<div class="tt-sets"></div>'}
-      <div class="tt-clock"><svg viewBox="0 0 200 200" aria-hidden="true"><circle class="tt-track" cx="100" cy="100" r="88"/><circle class="tt-ring" id="ttring" cx="100" cy="100" r="88" pathLength="1" stroke-dasharray="1" stroke-dashoffset="${total && rem !== null ? 1 - rem / total : 1}"/></svg>
-        <div id="clock" class="tt-time">${rem !== null ? fmtClock(rem) : fmtClock(Math.floor(stepElapsed(r, Date.now()) / 1000))}</div></div>
+      <div class="tt-stage"><div class="tt-anim" id="tt-anim"></div><div class="tt-clock"><svg viewBox="0 0 200 200" aria-hidden="true"><circle class="tt-track" cx="100" cy="100" r="88"/><circle class="tt-ring" id="ttring" cx="100" cy="100" r="88" pathLength="1" stroke-dasharray="1" stroke-dashoffset="${total && rem !== null ? 1 - rem / total : 1}"/></svg>
+        <div id="clock" class="tt-time">${rem !== null ? fmtClock(rem) : fmtClock(Math.floor(stepElapsed(r, Date.now()) / 1000))}</div></div></div>
       <div class="tt-target">${step.reps ? `${step.reps} rép.` : total && step.kind === 'travail' ? `${total} s` : ''}</div>
       <div class="tt-next">${upcoming ? `Ensuite · ${upcoming.kind === 'repos' ? 'repos' : esc(byId[upcoming.exerciseId]?.name ?? '')}` : 'Dernière étape'}</div>
       <div class="tt-zones"><button id="tt-back" ${r.index ? '' : 'disabled'} aria-label="Étape précédente">◀</button>
@@ -174,9 +180,20 @@ function runner(ctx, app) {
     $('#tt-back').onclick = () => set(previous(r, Date.now()));
     $('#tt-exit').onclick = () => { exitTatami(); draw(); };
     $('#tt-voice').onclick = () => { ctx.tatamiVoice = ctx.tatamiVoice === false; draw(); };
+    showMotion($('#tt-anim'), step);
     updateClock();
   }
   const next0 = () => next(r, Date.now(), {done: true, reps: r.steps[r.index].reps ?? null});
+  // Animation du mouvement type de l'étape (respiration pendant le repos). Une seule animation vivante à la fois.
+  let stopAnim = () => {};
+  function showMotion(host, step) {
+    stopAnim(); if (!host) return;
+    const m = step.kind === 'repos' ? {seq: motions.find(x => x.id === 'mvt-respiration'), approx: false} : motionFor(step.exerciseId);
+    if (!m) { host.hidden = true; return; }
+    stopAnim = mountInk(host, m.seq, {label: m.seq.name});
+    if (m.approx) host.insertAdjacentHTML('beforeend', '<small class="approx">mouvement approché</small>');
+  }
+  ctx.cleanup.push(() => stopAnim());
   const onKey = e => {
     if (!ctx.tatami || isOver(r)) return;
     const k = e.code;
@@ -211,13 +228,20 @@ function bilan(ctx, app, r, stopped = false) {
   <p class="intro">${esc(r.title)} · temps actif mesuré ${fmtClock(Math.round(r.activeMs / 1000))} · ${done} séries faites sur ${work}.</p></section>
   <form id="bilan" class="panel"><h2>Comment s’est passée la séance ?</h2>
     <label>Effort ressenti (1 très facile — 10 maximal)<input type="number" name="effort" min="1" max="10" value="5" required></label>
+    <fieldset class="bm-input"><legend>◍ Où sentez-vous des courbatures ? Touchez une zone : légère → forte → douleur → rien</legend>
+      <div class="bm-wrap"><div id="bm-host"></div><ul class="bm-legend"><li><i class="l1"></i>courbature légère</li><li><i class="l2"></i>courbature forte</li><li><i class="l3"></i>douleur</li></ul></div>
+      <p class="bm-warn" id="bm-warn" hidden>⚠ Une douleur n’est pas une courbature : arrêtez ce qui la provoque ; si elle persiste ou est vive, demandez un avis médical.</p></fieldset>
     <label>Notes (sensations, difficultés, idées pour la suite)<textarea name="notes" rows="3" maxlength="1000"></textarea></label>
     <p class="subtle">Le temps actif est mesuré par le minuteur (pauses exclues) ; les séries cochées sont celles que vous avez validées.</p>
     <div class="actions"><button class="primary">Enregistrer dans l’historique</button><button type="button" id="discard" class="danger">Ne pas enregistrer</button></div></form>`);
+  const body = {};
+  wireBodyInput($('#bm-host'), body, lv => { $('#bm-warn').hidden = !Object.values(lv).includes(3); });
   $('#bilan').onsubmit = e => {
     e.preventDefault();
     const d = new FormData(e.target);
-    pushLimited(s.sessions, summarize(r, Date.now(), {effort: Number(d.get('effort')), notes: String(d.get('notes')).slice(0, 1000), status: stopped ? 'arretee' : 'terminee'}));
+    const rec = summarize(r, Date.now(), {effort: Number(d.get('effort')), notes: String(d.get('notes')).slice(0, 1000), status: stopped ? 'arretee' : 'terminee'});
+    if (Object.keys(body).length) rec.body = {...body};
+    pushLimited(s.sessions, rec);
     s.activeSession = null; ctx.save(); notify('Séance enregistrée.'); ctx.go('entrainement');
   };
   $('#discard').onclick = () => { if (confirm('Abandonner cette séance sans l’enregistrer ?')) { s.activeSession = null; ctx.save(); ctx.go('entrainement'); } };
@@ -229,10 +253,18 @@ function exercisePage(ctx, app, id) {
   app.innerHTML = page('Exercice', `<section class="hero"><span class="kicker"><a href="#entrainement">Entraînement</a></span><h1>${esc(ex.name)}<span class="dot">.</span></h1>
   <p>${ex.capacities.map(c => `<span class="pill jade">${esc(capacities[c] ?? c)}</span>`).join('')}<span class="pill status-${ex.status}">${ex.status === 'brouillon' ? 'Brouillon IA, à relire' : esc(ex.status)}</span>
   ${ex.equipment.length ? ex.equipment.map(e => `<span class="pill">${esc(EQUIPMENT[e] ?? e)}</span>`).join('') : '<span class="pill">Sans matériel</span>'}</p></section>
+  ${motionFor(ex.id) ? `<section class="panel ink ex-stage"><div id="ex-3d"></div>${motionFor(ex.id).approx ? '<small class="approx">mouvement approché : l’animation montre l’idée générale</small>' : ''}</section>` : ''}
   <div class="split"><section class="panel"><h2>Exécution</h2><ol class="steps">${ex.execution.map(x => `<li>${esc(x)}</li>`).join('')}</ol>
     <h3>Points d’attention</h3><ul>${ex.cues.map(x => `<li>${esc(x)}</li>`).join('')}</ul><h3>Erreurs fréquentes</h3><ul>${ex.errors.map(x => `<li>${esc(x)}</li>`).join('')}</ul>
     <div class="notice">${esc(ex.vigilance)}</div></section>
   <section class="panel"><h2>Pour la pratique martiale</h2><p>${esc(ex.martialLink)}</p><h3>Variantes</h3><p><strong>Plus simple :</strong> ${esc(ex.easier)}</p><p><strong>Plus exigeant :</strong> ${esc(ex.harder)}</p>
     ${ex.alternatives.length ? `<h3>Remplaçants</h3><p>${ex.alternatives.map(a => `<a href="#entrainement/exercice/${a}">${esc(byId[a]?.name ?? a)}</a>`).join(' · ')}</p>` : ''}</section></div>`);
+  const m = motionFor(ex.id), host = $('#ex-3d');
+  if (!m || !host) return;
+  import('./mannequin3d.js').then(async mod => {
+    if (!mod.webglAvailable()) { ctx.cleanup.push(mountInk(host, m.seq, {label: ex.name})); return; }
+    const stop = await mod.mount3d(host, m.seq, {dims: mod.dimsFromState(ctx.state), loop: true, minimal: true});
+    if (host.isConnected) ctx.cleanup.push(stop); else stop();
+  }).catch(() => { ctx.cleanup.push(mountInk(host, m.seq, {label: ex.name})); });
 }
 
