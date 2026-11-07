@@ -6,6 +6,7 @@ import {EQUIPMENT, uid, pushLimited} from '../store.js';
 import {fitTemplate, buildSteps, startRun, play, pause, next, previous, remaining, stepElapsed, activeElapsed, isOver, summarize, nextTemplate, programWeek, estimateSeconds} from '../engine/coach.js';
 import {$, esc, page, fmtDate, fmtClock, notify, landscape} from '../ui.js';
 import {still} from './movement.js';
+import {progressBoard} from './charts.js';
 
 export const byId = Object.fromEntries(exercises.map(e => [e.id, e]));
 const KIND = {preparation: 'Préparation', travail: 'Exercice', repos: 'Repos', 'retour-au-calme': 'Retour au calme'};
@@ -27,6 +28,9 @@ function overview(ctx, app, chosenGoal) {
   app.innerHTML = page('Entraînement', `
   <section class="hero">${landscape()}<span class="kicker">Coaching</span><h1>S’entraîner pour pratiquer<span class="dot">.</span></h1>
   <p class="intro">Choisissez ce que vous voulez développer. LA FORGE explique quelles capacités sont travaillées, pourquoi, et comment s’y prendre.</p></section>
+  ${progressBoard(s.sessions)}
+  <div class="train-quick"><a class="tile" href="#reaction"><b>◎</b><span>Arène de réaction</span><small>3 niveaux · leurres</small></a>
+    <a class="tile" href="#inventer"><b>✧</b><span>Le Creuset</span><small>inventer une technique</small></a>${s.activeSession ? `<a class="tile hot" href="#entrainement/seance"><b>▶</b><span>Reprendre</span><small>séance en cours</small></a>` : ''}</div>
   ${s.activeSession ? `<div class="notice jade"><strong>Une séance est en cours :</strong> ${esc(s.activeSession.title)}. <a href="#entrainement/seance">Reprendre la séance</a></div>` : ''}
   <div class="tabs" role="tablist">${goals.map(g => `<button role="tab" aria-selected="${g.id === goal.id}" data-goal="${g.id}">${esc(g.name)}${active?.goalId === g.id ? ' ●' : ''}</button>`).join('')}</div>
   <div class="split">
@@ -96,8 +100,10 @@ function runner(ctx, app) {
   const persist = () => { s.activeSession = {...r, savedAt: Date.now()}; ctx.save(); lastSave = Date.now(); };
   const set = nr => { r = nr; persist(); draw(); };
   const draw = () => {
-    if (isOver(r)) return bilan(ctx, app, r);
+    if (isOver(r)) { exitTatami(); return bilan(ctx, app, r); }
     const step = r.steps[r.index], ex = byId[step.exerciseId], rem = remaining(r, Date.now());
+    announce(step, ex);
+    if (ctx.tatami) return drawTatami(step, ex, rem);
     const doneCount = r.log.filter(Boolean).length;
     app.innerHTML = page('Séance en cours', `
     <div class="runner"><section class="panel">
@@ -115,6 +121,7 @@ function runner(ctx, app) {
         ${step.kind === 'travail' ? '<button id="skip">Série non faite</button>' : ''}
         <button id="back" ${r.index ? '' : 'disabled'}>◀ Étape précédente</button>
         <button id="stop" class="danger">Arrêter la séance</button>
+        <button id="tatami" class="tatami-btn">⛶ Mode mains libres</button>
       </div>
       ${ex && step.kind !== 'repos' ? `<details open><summary>Exécution</summary><ol class="steps">${ex.execution.map(x => `<li>${esc(x)}</li>`).join('')}</ol></details>
         <details><summary>Points d’attention et erreurs fréquentes</summary><ul>${[...ex.cues, ...ex.errors].map(x => `<li>${esc(x)}</li>`).join('')}</ul><p class="subtle">${esc(ex.vigilance)}</p></details>
@@ -132,16 +139,63 @@ function runner(ctx, app) {
       if (!confirm('Arrêter la séance ? Vous pourrez enregistrer ce qui a été fait ou tout abandonner.')) return;
       bilan(ctx, app, pause(r, Date.now()), true);
     };
+    $('#tatami').onclick = () => { ctx.tatami = true; keepAwake(); draw(); };
     updateClock();
   };
+  // ——— Mode mains libres (« tatami ») : lisible à 3 m, grandes zones tactiles, clavier, voix et écran gardé allumé ———
+  let spoken = -1, lock = null;
+  const say = text => { if (ctx.tatamiVoice === false || !('speechSynthesis' in window)) return; try { speechSynthesis.cancel(); const u = new SpeechSynthesisUtterance(text); u.lang = 'fr-FR'; u.rate = 1.02; speechSynthesis.speak(u); } catch { /* voix indisponible */ } };
+  function announce(step, ex) {
+    if (!ctx.tatami || spoken === r.index) return;
+    spoken = r.index;
+    say(step.kind === 'repos' ? `Repos. Ensuite : ${byId[r.steps[r.index + 1]?.exerciseId]?.name ?? 'fin'}.` : `${ex?.name ?? ''}. ${step.kind === 'travail' ? `Série ${step.set} sur ${step.sets}. ` : ''}${step.reps ? `${step.reps} répétitions.` : step.durationSec ? `${step.durationSec} secondes.` : ''}`);
+  }
+  const keepAwake = async () => { try { lock = await navigator.wakeLock?.request('screen'); } catch { lock = null; } };
+  const exitTatami = () => { ctx.tatami = false; spoken = -1; try { lock?.release(); speechSynthesis?.cancel(); } catch { /* rien à libérer */ } lock = null; };
+  function drawTatami(step, ex, rem) {
+    const total = step.durationSec ?? null, upcoming = r.steps[r.index + 1];
+    const icon = {preparation: '↑', travail: '●', repos: '◌', 'retour-au-calme': '↓'}[step.kind];
+    app.innerHTML = `<div class="tatami ${step.kind}" id="tatami-view">
+      <div class="tt-top"><span>${icon} ${KIND[step.kind]}</span><span>${r.index + 1} / ${r.steps.length}</span>
+        <span><button id="tt-voice" aria-pressed="${ctx.tatamiVoice !== false}">♪ Voix</button><button id="tt-exit" aria-label="Quitter le mode mains libres">✕</button></span></div>
+      <h1 class="tt-name">${step.kind === 'repos' ? 'Repos' : esc(ex?.name ?? step.exerciseId)}</h1>
+      ${step.kind === 'travail' ? `<div class="tt-sets">${Array.from({length: step.sets}, (_, i) => `<i class="${i < step.set - 1 ? 'done' : i === step.set - 1 ? 'now' : ''}"></i>`).join('')}</div>` : '<div class="tt-sets"></div>'}
+      <div class="tt-clock"><svg viewBox="0 0 200 200" aria-hidden="true"><circle class="tt-track" cx="100" cy="100" r="88"/><circle class="tt-ring" id="ttring" cx="100" cy="100" r="88" pathLength="1" stroke-dasharray="1" stroke-dashoffset="${total && rem !== null ? 1 - rem / total : 1}"/></svg>
+        <div id="clock" class="tt-time">${rem !== null ? fmtClock(rem) : fmtClock(Math.floor(stepElapsed(r, Date.now()) / 1000))}</div></div>
+      <div class="tt-target">${step.reps ? `${step.reps} rép.` : total && step.kind === 'travail' ? `${total} s` : ''}</div>
+      <div class="tt-next">${upcoming ? `Ensuite · ${upcoming.kind === 'repos' ? 'repos' : esc(byId[upcoming.exerciseId]?.name ?? '')}` : 'Dernière étape'}</div>
+      <div class="tt-zones"><button id="tt-back" ${r.index ? '' : 'disabled'} aria-label="Étape précédente">◀</button>
+        <button id="tt-play" class="${r.running ? 'on' : ''}" aria-label="${r.running ? 'Pause' : 'Démarrer'}">${r.running ? '❚❚' : '▶'}</button>
+        <button id="tt-done" aria-label="${step.kind === 'travail' ? 'Série faite' : 'Étape suivante'}">✓</button></div>
+      <span id="active" hidden></span><i id="bar" hidden></i>
+    </div>`;
+    $('#tt-play').onclick = () => set(r.running ? pause(r, Date.now()) : play(r, Date.now()));
+    $('#tt-done').onclick = () => set(next0());
+    $('#tt-back').onclick = () => set(previous(r, Date.now()));
+    $('#tt-exit').onclick = () => { exitTatami(); draw(); };
+    $('#tt-voice').onclick = () => { ctx.tatamiVoice = ctx.tatamiVoice === false; draw(); };
+    updateClock();
+  }
+  const next0 = () => next(r, Date.now(), {done: true, reps: r.steps[r.index].reps ?? null});
+  const onKey = e => {
+    if (!ctx.tatami || isOver(r)) return;
+    const k = e.code;
+    if (k === 'Space') { e.preventDefault(); set(r.running ? pause(r, Date.now()) : play(r, Date.now())); }
+    else if (k === 'Enter' || k === 'ArrowRight') { e.preventDefault(); set(next0()); }
+    else if (k === 'ArrowLeft') { e.preventDefault(); set(previous(r, Date.now())); }
+    else if (k === 'Escape') { exitTatami(); draw(); }
+  };
+  addEventListener('keydown', onKey);
+  ctx.cleanup.push(() => { removeEventListener('keydown', onKey); exitTatami(); });
   const updateClock = () => {
     if (isOver(r) || !$('#clock')) return;
     const now = Date.now(), step = r.steps[r.index], rem = remaining(r, now);
     $('#clock').textContent = rem !== null ? fmtClock(rem) : fmtClock(Math.floor(stepElapsed(r, now) / 1000));
     $('#bar').style.width = rem !== null && step.durationSec ? `${100 * (1 - rem / step.durationSec)}%` : '0%';
+    $('#ttring')?.setAttribute('stroke-dashoffset', rem !== null && step.durationSec ? String(1 - rem / step.durationSec) : '1');
     $('#active').textContent = fmtClock(Math.floor(activeElapsed(r, now) / 1000));
     if (r.running && rem === 0) { beep(step.kind === 'repos' ? 880 : 520); set(next(r, now, {done: true})); return; }
-    if (r.running && rem !== null && rem <= 3 && rem > 0 && rem !== tick) { tick = rem; beep(440, 80); }
+    if (r.running && rem !== null && rem <= 3 && rem > 0 && rem !== tick) { tick = rem; beep(440, 80); if (ctx.tatami) say(String(rem)); }
     if (r.running && now - lastSave > 5000) persist();
   };
   const iv = setInterval(updateClock, 250);

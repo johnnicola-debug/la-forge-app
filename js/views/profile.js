@@ -32,7 +32,7 @@ export function render(ctx, app) {
     <section class="panel"><h2>Mes performances et mesures</h2><p>Charges, tractions, endurance, mobilité : tout se saisit et se consulte dans l’onglet <a href="#avatar">Personnage et données</a>, avec la date et l’origine de chaque valeur.</p></section>
   </div>
   <div class="split even">
-    <section class="panel" id="reaction"><h2>Test de réaction</h2>
+    <section class="panel" id="reaction"><h2>Test de réaction</h2><p><a class="button primary" href="#reaction">◎ Entrer dans l’arène de réaction (3 niveaux, 4 directions, leurres)</a></p>
       <div class="row"><label>Type<select id="rx-mode">${options(Object.fromEntries(Object.entries(MODES).map(([k, v]) => [k, v.name])), 'simple')}</select></label></div>
       <div class="reaction-pad" id="rx-pad" tabindex="0" role="button" aria-label="Zone de réaction : cliquez ou appuyez sur Espace"><div><div class="disc"></div><p id="rx-msg">Cliquez ici pour commencer une série.</p></div></div>
       <p id="rx-res" role="status" class="subtle"></p>

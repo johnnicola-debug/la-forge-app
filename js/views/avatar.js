@@ -22,6 +22,7 @@ export const METRICS = [
   {id: 'test:squat-profond', cat: 'mobilite'}, {id: 'test:flexion-avant', cat: 'mobilite'},
   {id: 'test:equilibre-unipodal', cat: 'equilibre'}, {id: 'test:pas-croises', cat: 'equilibre'},
   {id: 'test:reaction-simple', cat: 'reaction', name: 'Réaction simple (écran)', app: true}, {id: 'test:reaction-choix', cat: 'reaction', name: 'Réaction à choix (écran)', app: true},
+  ...[1, 2, 3].map(l => ({id: 'test:reaction-arene-' + l, cat: 'reaction', name: `Arène de réaction, niveau ${l} (écran)`, app: true, href: '#reaction'})),
   {id: 'test:rythme-calme', cat: 'recuperation'}
 ].map(m => m.kind ? m : {...m, kind: 'test', test: m.id.slice(5), name: m.name ?? A[m.id.slice(5)]?.name ?? m.id});
 const CATS = {morpho: 'Morphologie', force: 'Force', endurance: 'Endurance', puissance: 'Explosivité', mobilite: 'Mobilité et souplesse', equilibre: 'Équilibre et coordination', reaction: 'Réaction', recuperation: 'Récupération'};
@@ -98,7 +99,7 @@ export function render(ctx, app) {
       return `<div class="panel stat-cat ${rows.some(r => r.h.length) ? 'has' : ''} ${ctx.flash === cat ? 'flash' : ''}"><h2>${esc(label)}</h2>${rows.map(({m, h}) => `<div class="stat">
         <div><span>${esc(m.name)}</span>${h.length ? `<strong>${esc(h[0].text)}</strong><small>${fmtDate(h[0].date)} · <span class="origin o-${h[0].origin}">${esc(ORIGINS[h[0].origin])}</span>${h.length > 1 ? ` · ${h.length} valeurs` : ''}</small>`
           : '<em>inconnu</em>'}${h.length ? gradeChip(s, m, h[0]) : ''}</div>${spark(h)}
-        ${m.app ? `<a class="button small" href="#profil">Tester</a>` : `<button class="small" data-add="${m.id}">${h.length ? '+' : 'Ajouter'}</button>`}</div>`).join('')}</div>`;
+        ${m.app ? `<a class="button small" href="${m.href ?? '#profil'}">Tester</a>` : `<button class="small" data-add="${m.id}">${h.length ? '+' : 'Ajouter'}</button>`}</div>`).join('')}</div>`;
     }).join('')}</section>
   </div>
   ${sel ? addForm(METRICS.find(m => m.id === sel)) : ''}
