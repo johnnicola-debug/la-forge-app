@@ -15,9 +15,10 @@ import * as ways from './views/ways.js';
 import * as community from './views/community.js';
 import * as data from './views/data.js';
 import * as map from './views/map.js';
+import * as inventer from './views/inventer.js';
 import * as sound from './engine/sound.js';
 
-const routes = {carte: map, accueil: home, orientation, avatar, profil: profile, entrainement: training, bibliotheque: library, arbre: tree,
+const routes = {carte: map, inventer, accueil: home, orientation, avatar, profil: profile, entrainement: training, bibliotheque: library, arbre: tree,
   forge, atelier: workshop, voies: ways, guildes: community, donnees: data};
 // Rubrique de navigation mise en évidence pour les sous-pages.
 const navOf = {profil: 'avatar', atelier: 'forge'};

@@ -1,6 +1,7 @@
 // Bibliothèque martiale v2 : fiches structurées (anatomie, principes, risques, transferts, sources et fiabilité),
 // accès par discipline, famille, compétence, principe ou muscle ; planche d'étude 2D ou mannequin 3D.
 // Consulté ≠ travaillé ≠ évalué : l'évaluation se fait dans l'arbre, par une personne qualifiée.
+import {ROLES} from '../engine/generator.js';
 import {families, entries} from '../data/library.js';
 import {skillById} from '../data/skills.js';
 import {byId as exById} from './training.js';
@@ -42,7 +43,7 @@ export function render(ctx, app, [id]) {
   const list = entries.filter(x => (!f.q || (x.title + ' ' + x.objective).toLowerCase().includes(f.q.toLowerCase()))
     && (!f.disc || x.origin === f.disc || x.disciplines.includes(f.disc)) && (!f.skill || x.skills?.includes(f.skill))
     && (!f.principle || x.principles?.includes(f.principle)) && (!f.muscle || x.muscles?.includes(f.muscle)));
-  const view3d = ctx.lib3d ?? false;
+  const view3d = ctx.lib3d ?? true;
   const related = entries.filter(x => x.id !== e.id && (x.prerequisites.includes(e.id) || (x.skills ?? []).some(k => (e.skills ?? []).includes(k) && !k.startsWith('spe-')))).slice(0, 6);
   app.innerHTML = page('Bibliothèque martiale', `
   <section class="hero compact"><span class="kicker">Bibliothèque martiale</span><h1>Décomposer pour comprendre<span class="dot">.</span></h1>
@@ -61,10 +62,16 @@ export function render(ctx, app, [id]) {
     <article class="stack">
       <section class="panel"><div class="head"><h2>${esc(e.title)}</h2><span><span class="pill status-${e.editorial.status}">${STATUS[e.editorial.status]}</span>
         <span class="pill">${esc(LEVEL[e.level] ?? '')}</span>${e.disciplines.map(d => `<span class="pill jade">${esc(DISC[d] ?? d)}</span>`).join('')}</span></div>
-        <p class="intro">${esc(e.objective)}</p><p>${esc(e.context)}</p>
+        <p class="intro">${esc(e.objective)}</p>
         ${e.sequence ? `<div class="view-switch" role="tablist"><button role="tab" data-v="2d" aria-selected="${!view3d}">Planche d’étude 2D</button><button role="tab" data-v="3d" aria-selected="${view3d}">Mannequin 3D</button></div><div id="viewer"></div>`
           : '<p class="empty">Pas encore d’illustration animée pour cette fiche.</p>'}
       </section>
+      <section class="panel fiche-bar"><div class="chips">${(e.muscles ?? []).map(m => `<button class="chip" data-muscle="${m}">◉ ${esc(MUSCLES[m] ?? m)}</button>`).join('')}${(e.joints ?? []).map(j => `<span class="chip">⌾ ${esc(JOINTS[j] ?? j)}</span>`).join('')}</div>
+        ${e.risks ? `<p class="fiche-risk">⚠ ${esc(String(e.risks).split(/(?<=\.)\s/)[0])}</p>` : ''}
+        <div class="actions"><button class="primary" id="practiced">✓ Travaillée aujourd’hui</button>${ROLES[e.sequence]?.[0] === 'attack' ? `<a class="button" href="#inventer/${e.sequence}">✧ Inventer à partir de ce geste</a>` : ''}<a class="button" href="#atelier">Atelier</a>
+          <small class="subtle">${practiced.length ? `travaillée ${practiced.length} fois` : ''}</small></div></section>
+      <details class="fiche-more"><summary>Le détail écrit : contexte, étapes, erreurs, principes, risques, sources</summary>
+        <p>${esc(e.context)}</p>
       <div class="split even">
         <section class="panel"><h2>Décomposition</h2><ol class="steps">${e.steps.map(x => `<li>${esc(x)}</li>`).join('')}</ol>
           <h3>Erreurs fréquentes</h3><ul>${e.errors.map(x => `<li>${esc(x)}</li>`).join('')}</ul>
@@ -83,7 +90,7 @@ export function render(ctx, app, [id]) {
           <h3>Mon rapport à cette fiche</h3>
           <dl class="kv"><dt>Consultée</dt><dd>${fmtDate(s.library.consulted[e.id])}</dd><dt>Travaillée</dt><dd>${practiced.length ? `${practiced.length} fois, dernière le ${fmtDate(practiced[0])}` : 'pas encore'}</dd>
           <dt>Évaluée</dt><dd><span class="subtle">Dans l’arbre, par une personne qualifiée.</span></dd></dl>
-          <div class="actions"><button class="primary" id="practiced">J’ai travaillé cette fiche aujourd’hui</button><a class="button" href="#atelier">Utiliser dans l’atelier</a></div></section>
+</section>
         <section class="panel"><h2>Risques et transferts</h2><div class="notice error"><strong>Risques et précautions.</strong> ${esc(e.risks ?? '')}</div>
           ${(e.transfers ?? []).length ? `<h3>Vers d’autres disciplines</h3><ul>${e.transfers.map(t => `<li><strong>${esc(DISC[t.to] ?? t.to)}</strong> <span class="rel r-${t.reliability}">${REL[t.reliability] ?? ''}</span> — ${esc(t.note)}</li>`).join('')}</ul>` : ''}
           ${related.length ? `<h3>Fiches liées</h3><p>${related.map(x => `<a href="#bibliotheque/${x.id}">${esc(x.title)}</a>`).join(' · ')}</p>` : ''}</section>
@@ -96,6 +103,7 @@ export function render(ctx, app, [id]) {
           <p class="subtle">Circuit prévu : brouillon → sources vérifiées → relecture technique par une personne identifiée → publication versionnée. Aucun contenu généré par IA n’est validé automatiquement.</p></details>
         <form id="correction"><label>Signaler une erreur ou proposer une correction (consignée dans votre carnet)<textarea name="text" rows="2" maxlength="800"></textarea></label><button>Consigner la proposition</button></form>
       </section>
+      </details>
     </article>
   </div>`);
   if (e.sequence) mountView(ctx, e, view3d);

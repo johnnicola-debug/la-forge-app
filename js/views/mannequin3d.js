@@ -29,13 +29,13 @@ export function dimsFromState(state) {
 const VIEWS = {'Trois-quarts': [2.2, 1.35, 2.2], Profil: [0.25, 1.05, 3.1], Face: [3.1, 1.15, 0.05], Dessus: [0.25, 3.8, 0.3], 'Première personne': null, Adversaire: null};
 
 // `seqId` : identifiant d'une séquence du moteur, ou séquence composée (objet avec keys). `d3` : réglages 3D imposés (garde hybride).
-export async function mount3d(host, seqId, {muscles = [], glow = [], dims = bodyDims(), compact = false, d3 = null, transparent = false, height = null} = {}) {
+export async function mount3d(host, seqId, {muscles = [], glow = [], dims = bodyDims(), compact = false, d3 = null, transparent = false, height = null, loop = false, minimal = false} = {}) {
   const THREE = await import('../../vendor/three/three.module.min.js');
   const {OrbitControls} = await import('../../vendor/three/OrbitControls.js');
   const seq = typeof seqId === 'object' ? seqId : sequenceById(seqId), keys = keyPositions(seq), H = dims.H;
-  host.innerHTML = `<div class="m3d ${compact ? 'compact' : ''}"><div class="m3d-canvas"></div>
+  host.innerHTML = `<div class="m3d ${compact ? 'compact' : ''} ${minimal ? 'minimal' : ''}"><div class="m3d-canvas"></div>
     ${compact ? '' : `<div class="timeline">${seq.keys.map((k, i) => `<button data-key="${i}" aria-pressed="${i === 0}">${esc(k.label)}</button>`).join('')}<span class="bar"></span></div>
-    <div class="controls"><button data-act="prev" aria-label="Phase précédente">◀</button><button data-act="play">Lire</button><button data-act="next" aria-label="Phase suivante">▶</button>
+    <div class="controls"><button data-act="prev" aria-label="Phase précédente">◀</button><button data-act="play">${loop ? 'Pause' : 'Lire'}</button><button data-act="next" aria-label="Phase suivante">▶</button>
       <label>Vitesse <select data-act="speed"><option value="0.1">× 0,1</option><option value="0.25">× 0,25</option><option value="0.5" selected>× 0,5</option><option value="1">× 1</option></select></label>
       <input type="range" min="0" max="1000" value="0" data-act="scrub" aria-label="Position dans le mouvement">
       <span class="views">${Object.keys(VIEWS).map(v => `<button data-view="${v}" aria-pressed="${v === 'Trois-quarts'}">${v}</button>`).join('')}</span>
@@ -123,13 +123,14 @@ export async function mount3d(host, seqId, {muscles = [], glow = [], dims = body
   const main = makeFigure(matBody, false);
   const ghosts = compact ? [] : seq.keys.map(k => { const g = makeFigure(matGhost, true); pose(g, joints3d(k.pose, dims, extrasOf(seq, k.pose)), extrasOf(seq, k.pose)); return g; });
 
+  if (minimal) ghosts.forEach(g => { g.visible = false; });   // vue épurée (Creuset) : le geste seul, avec son équilibre
   // Centre de masse : sphère dorée, fil à plomb, polygone d'appui au sol (vert si le centre est au-dessus, rouge sinon).
   const comBall = new THREE.Mesh(new THREE.SphereGeometry(0.03, 16, 12), new THREE.MeshStandardMaterial({color: '#e2c27a', emissive: '#a07b2c', emissiveIntensity: 0.9}));
   const plumb = new THREE.Line(new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(), new THREE.Vector3()]), new THREE.LineDashedMaterial({color: '#e2c27a', dashSize: 0.03, gapSize: 0.03}));
   const polyMat = new THREE.LineBasicMaterial({color: '#5fc39b'}), poly = new THREE.LineLoop(new THREE.BufferGeometry(), polyMat);
   const comGroup = new THREE.Group(); comGroup.add(comBall, plumb, poly); comGroup.visible = !compact; scene.add(comGroup);
 
-  const st = {u: 0, speed: compact ? 0.35 : 0.5, playing: compact, last: 0, view: 'Trois-quarts', j: null};
+  const st = {u: 0, speed: compact ? 0.35 : 0.5, playing: compact || loop, last: 0, view: 'Trois-quarts', j: null};
   const cue = $('.cue', host), scrub = $('[data-act=scrub]', host), playBtn = $('[data-act=play]', host);
   function update() {
     const s3 = sample3d(seq, st.u, samplePose), p = s3.pose, phase = s3.phase, extras = d3 ? {...s3.extras, ...d3} : s3.extras, j = joints3d(p, dims, extras);
@@ -163,14 +164,14 @@ export async function mount3d(host, seqId, {muscles = [], glow = [], dims = body
   else if (compact) { camera.position.set(1.9, 1.25, 2.6); controls.target.set(0.05, 0.92 * H / 1.75, 0); controls.autoRotate = true; controls.autoRotateSpeed = 0.8; controls.enableZoom = false; controls.update(); }
   else setView('Trois-quarts');
   let raf = 0, alive = true;
-  const loop = t => {
+  const frame = t => {
     if (!alive) return;
     if (st.playing) {
       const dt = st.last ? t - st.last : 0; st.u = st.u + dt * st.speed / sequenceDuration(seq);
-      if (st.u >= 1) { if (compact) st.u = 0; else { st.u = 1; st.playing = false; playBtn.textContent = 'Lire'; } }
+      if (st.u >= 1) { if (compact || loop) st.u = 0; else { st.u = 1; st.playing = false; playBtn.textContent = 'Lire'; } }
       update();
     }
-    st.last = t; if (controls.enabled) controls.update(); else if (!transparent) follow(); renderer.render(scene, camera); raf = requestAnimationFrame(loop);
+    st.last = t; if (controls.enabled) controls.update(); else if (!transparent) follow(); renderer.render(scene, camera); raf = requestAnimationFrame(frame);
   };
   host.addEventListener('click', e => {
     const b = e.target.closest('button'); if (!b || !host.contains(b)) return;
@@ -191,6 +192,6 @@ export async function mount3d(host, seqId, {muscles = [], glow = [], dims = body
   host.addEventListener('input', onInput); host.addEventListener('change', e => { if (e.target.type === 'checkbox') onInput(e); });
   const ro = new ResizeObserver(() => { const [W, Hh] = size(); renderer.setSize(W, Hh); camera.aspect = W / Hh; camera.updateProjectionMatrix(); });
   ro.observe(box);
-  update(); raf = requestAnimationFrame(loop);
+  update(); raf = requestAnimationFrame(frame);
   return () => { alive = false; cancelAnimationFrame(raf); ro.disconnect(); controls.dispose(); renderer.dispose(); scene.traverse(o => { o.geometry?.dispose?.(); }); };
 }

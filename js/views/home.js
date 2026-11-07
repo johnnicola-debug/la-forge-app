@@ -48,8 +48,8 @@ export function render(ctx, app) {
   <section class="seuil">${sceneSvg(frame('garde', 0))}<div class="seuil-3d" id="seuil-3d" aria-hidden="true"></div>
     <div class="seuil-text"><span class="kicker">Votre dojo numérique</span><h1>La pratique devient une voie<span class="dot">.</span></h1>
     <p class="intro">${p.name ? `${esc(p.name)}, ` : ''}entraînez votre corps, comprenez la pratique martiale, et forgez peu à peu un style qui vous ressemble.</p>
-    <div class="actions">${o ? `<a class="button primary" href="#entrainement/${prog.goalId}">Reprendre l’entraînement</a><a class="button" href="#carte">Carte du monde</a>`
-      : `<a class="button primary" href="#orientation">Entrer dans la forge</a><a class="button" href="#carte">Explorer le domaine</a>`}</div></div>
+    <div class="actions">${o ? `<a class="button primary" href="#entrainement/${prog.goalId}">Reprendre l’entraînement</a><a class="button" href="#inventer">✧ Inventer une technique</a>`
+      : `<a class="button primary" href="#orientation">Entrer dans la forge</a><a class="button" href="#inventer">✧ Inventer une technique</a>`}</div></div>
   </section>
   <div class="split">
     <section class="panel ink"><h2>Prochaine séance</h2><p class="serif">${esc(prog.name)} · Séance ${esc(tpl.id)} — ${esc(tpl.title)}</p>

@@ -17,10 +17,11 @@ const PLACES = [
   {id: 'temple', name: 'Le Temple des voies', href: '#voies', x: 520, y: 95, glyph: 'temple', text: 'Foudre, Racine, Vent'},
   {id: 'oracle', name: 'L’Oracle', href: '#orientation', x: 175, y: 175, glyph: 'oracle', text: 'Découvrir vos penchants'},
   {id: 'village', name: 'Le Village des guildes', href: '#guildes', x: 120, y: 360, glyph: 'village', text: 'Pratiquer ensemble (à venir)'},
+  {id: 'creuset', name: 'Le Creuset', href: '#inventer', x: 655, y: 150, glyph: 'crucible', text: 'Inventer des techniques'},
   {id: 'archives', name: 'Les Archives', href: '#donnees', x: 880, y: 545, glyph: 'archive', text: 'Sauvegarder, exporter'}
 ];
 const PATHS = [['seuil', 'reflet'], ['seuil', 'cour'], ['seuil', 'archives'], ['reflet', 'pavillon'], ['reflet', 'village'], ['cour', 'forge'], ['cour', 'atelier'],
-  ['pavillon', 'arbre'], ['arbre', 'forge'], ['forge', 'atelier'], ['arbre', 'temple'], ['pavillon', 'oracle'], ['oracle', 'temple'], ['village', 'oracle']];
+  ['pavillon', 'arbre'], ['arbre', 'forge'], ['forge', 'atelier'], ['arbre', 'temple'], ['pavillon', 'oracle'], ['oracle', 'temple'], ['village', 'oracle'], ['forge', 'creuset'], ['creuset', 'temple']];
 
 // Petits glyphes à l'encre, dessinés autour de (0, 0).
 const G = {
@@ -34,6 +35,7 @@ const G = {
   temple: '<path d="M-44 -2l44 -24 44 24M-36 -2v24M-12 -2v24M12 -2v24M36 -2v24M-46 22h92"/><path d="M-30 -14q30 -12 60 0"/>',
   oracle: '<circle r="18"/><circle r="6"/><path d="M-30 0h-8M30 0h8M0 -30v-8M0 30v8"/>',
   village: '<path d="M-36 16v-14l12 -10 12 10v14zM-6 16v-20l14 -12 14 12v20zM24 16v-10l8 -8 8 8v10z"/>',
+  crucible: '<path d="M-26 -14h52l-8 30h-36z"/><path d="M-8 -22q4 -10 0 -18M6 -22q4 -8 0 -14"/><circle cx="0" cy="2" r="5"/>',
   archive: '<rect x="-24" y="-20" width="48" height="40" rx="3"/><path d="M-24 -6h48M-24 8h48M-6 -13h12M-6 1h12M-6 15h12"/>'
 };
 
@@ -45,6 +47,7 @@ export function render(ctx, app) {
   const known = s.measurements.length + s.performances.length, methods = s.workshop.methods.length;
   const hint = {arbre: `${engaged} / ${skills.length} compétences engagées`, atelier: methods ? `${methods} méthode(s)` : 'Aucune méthode',
     reflet: known ? `${known} mesure(s) consignée(s)` : 'Aucune mesure', oracle: s.orientation ? 'Orientation faite' : 'À consulter',
+    creuset: ctx.creuset?.history?.length ? `${ctx.creuset.history.length} invention(s) cette visite` : 'Inventer des techniques',
     cour: s.activeSession ? 'Une séance en cours' : `${s.sessions.length} séance(s)`};
   const P = Object.fromEntries(PLACES.map(p => [p.id, p]));
   app.innerHTML = page('Carte du monde', `
