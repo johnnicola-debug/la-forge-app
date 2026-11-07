@@ -1,5 +1,5 @@
 // Généré par tools/precache.mjs — ne pas modifier à la main.
-self.PRECACHE_VERSION = '0e6795f04628';
+self.PRECACHE_VERSION = '7879b8f95df4';
 self.PRECACHE = [
  "./",
  "icons/apple-touch-icon.png",
@@ -19,6 +19,7 @@ self.PRECACHE = [
  "js/data/sequences.js",
  "js/data/skills.js",
  "js/data/transfers.js",
+ "js/engine/adapt.js",
  "js/engine/arena.js",
  "js/engine/assistant.js",
  "js/engine/body.js",
@@ -45,6 +46,7 @@ self.PRECACHE = [
  "js/views/bodymap.js",
  "js/views/charts.js",
  "js/views/community.js",
+ "js/views/composer.js",
  "js/views/data.js",
  "js/views/forge.js",
  "js/views/gesture.js",

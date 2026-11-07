@@ -10,6 +10,10 @@ import {progressBoard} from './charts.js';
 import {motionFor, motions} from '../data/motions.js';
 import {mountInk} from './inkloop.js';
 import {bodyBoard, wireBodyInput} from './bodymap.js';
+import {adapt} from '../engine/adapt.js';
+import {zonesOf} from '../data/motions.js';
+import {stillInk} from './inkloop.js';
+import * as composer from './composer.js';
 
 export const byId = Object.fromEntries(exercises.map(e => [e.id, e]));
 const KIND = {preparation: 'Préparation', travail: 'Exercice', repos: 'Repos', 'retour-au-calme': 'Retour au calme'};
@@ -17,6 +21,7 @@ const KIND = {preparation: 'Préparation', travail: 'Exercice', repos: 'Repos', 
 export function render(ctx, app, [sub, arg]) {
   if (sub === 'seance') return runner(ctx, app);
   if (sub === 'exercice') return exercisePage(ctx, app, arg);
+  if (sub === 'composer') return composer.render(ctx, app, arg);
   overview(ctx, app, arg);
 }
 
@@ -26,7 +31,9 @@ function overview(ctx, app, chosenGoal) {
   const goal = goals.find(g => g.id === chosenGoal) ?? (active && goals.find(g => g.id === active.goalId)) ?? goals.find(g => p.goals.includes(g.id)) ?? goals[0];
   const prog = programs.find(x => x.id === goal.programId);
   const template = active?.id === prog.id ? nextTemplate(prog, s.sessions) : prog.sessions[0];
-  const fit = fitTemplate(template, p.minutes);
+  // Séance adaptée à la personne (historique, record, carte du corps, voie), sauf si elle demande la séance d'origine.
+  const adapted = adapt(template, {state: s, byId, zonesOf}), useAdapted = !ctx.rawPlan;
+  const fit = fitTemplate(useAdapted ? adapted.template : template, p.minutes);
   const built = buildSteps(fit.template, byId, p.equipment);
   app.innerHTML = page('Entraînement', `
   <section class="hero">${landscape()}<span class="kicker">Coaching</span><h1>S’entraîner pour pratiquer<span class="dot">.</span></h1>
@@ -34,7 +41,7 @@ function overview(ctx, app, chosenGoal) {
   ${progressBoard(s.sessions)}
   ${bodyBoard(s.sessions)}
   <div class="train-quick"><a class="tile" href="#reaction"><b>◎</b><span>Arène de réaction</span><small>3 niveaux · leurres</small></a>
-    <a class="tile" href="#inventer"><b>✧</b><span>Le Creuset</span><small>inventer une technique</small></a>${s.activeSession ? `<a class="tile hot" href="#entrainement/seance"><b>▶</b><span>Reprendre</span><small>séance en cours</small></a>` : ''}</div>
+    <a class="tile" href="#entrainement/composer"><b>✎</b><span>Composer</span><small>ma propre séance${(s.custom ?? []).length ? ` · ${s.custom.length} enregistrée(s)` : ''}</small></a><a class="tile" href="#inventer"><b>✧</b><span>Le Creuset</span><small>inventer une technique</small></a>${s.activeSession ? `<a class="tile hot" href="#entrainement/seance"><b>▶</b><span>Reprendre</span><small>séance en cours</small></a>` : ''}</div>
   ${s.activeSession ? `<div class="notice jade"><strong>Une séance est en cours :</strong> ${esc(s.activeSession.title)}. <a href="#entrainement/seance">Reprendre la séance</a></div>` : ''}
   <div class="tabs" role="tablist">${goals.map(g => `<button role="tab" aria-selected="${g.id === goal.id}" data-goal="${g.id}">${esc(g.name)}${active?.goalId === g.id ? ' ●' : ''}</button>`).join('')}</div>
   <div class="split">
@@ -58,10 +65,14 @@ function overview(ctx, app, chosenGoal) {
       ${fit.over ? '<p class="notice">Cette séance dépasse votre temps disponible même raccourcie : faites-la plus tard ou choisissez une autre séance.</p>' : ''}
       ${fit.changes.length ? `<p class="subtle">Adaptée à votre temps : ${esc(fit.changes.join(' ; '))}.</p>` : ''}
       ${built.notes.length ? `<p class="subtle">Adaptée à votre matériel : ${esc(built.notes.join(' ; '))}.</p>` : ''}
-      <ol class="steps">${[...fit.template.warmup.map(w => ['Préparation', w.exerciseId, `${Math.round(w.durationSec / 60 * 10) / 10} min`]),
-        ...fit.template.main.map(b => ['Exercice', b.exerciseId, `${b.sets} × ${b.reps ? b.reps + ' rép.' : b.durationSec + ' s'} · repos ${b.restSec} s`]),
-        ...fit.template.cooldown.map(c => ['Retour au calme', c.exerciseId, `${Math.round(c.durationSec / 60 * 10) / 10} min`])]
-        .map(([k, id, d]) => `<li><small>${k}</small> <a href="#entrainement/exercice/${id}">${esc(byId[id]?.name ?? id)}</a> <small>${esc(d)}</small></li>`).join('')}</ol>
+      <div class="adapt-switch"><button data-plan="adapt" aria-pressed="${useAdapted}">◈ Adaptée à moi${adapted.changes.length ? ` · ${adapted.changes.length}` : ''}</button><button data-plan="raw" aria-pressed="${!useAdapted}">Séance du programme</button></div>
+      <p class="plan-mini">${fit.template.warmup.map(w => `<a class="chip" href="#entrainement/exercice/${w.exerciseId}">↑ ${esc(byId[w.exerciseId]?.name ?? w.exerciseId)} · ${Math.round(w.durationSec / 60)} min</a>`).join(' ')}</p>
+      <ol class="plan-cards">${fit.template.main.map(b => `<li class="plan-card"><a class="pc-thumb" href="#entrainement/exercice/${b.exerciseId}">${motionFor(b.exerciseId) ? stillInk(motionFor(b.exerciseId).seq) : ''}</a>
+        <span class="pc-body"><a href="#entrainement/exercice/${b.exerciseId}">${esc(byId[b.exerciseId]?.name ?? b.exerciseId)}</a><b class="pc-dose">${b.sets} × ${b.reps ? b.reps + ' rép.' : b.durationSec + ' s'}</b><small>repos ${b.restSec} s</small>
+        ${(useAdapted ? b.why ?? [] : []).map(c => `<span class="ad-chip ad-${c.kind}" title="${esc(c.text)}"><b>${c.icon}</b>${esc(c.text)}</span>`).join('')}</span></li>`).join('')}</ol>
+      ${useAdapted && adapted.changes.some(c => c.kind === 'retire') ? adapted.changes.filter(c => c.kind === 'retire').map(c => `<p class="ad-chip ad-retire"><b>✕</b>${esc(byId[c.exerciseId]?.name ?? '')} — ${esc(c.text)}</p>`).join('') : ''}
+      <p class="plan-mini">${fit.template.cooldown.map(w => `<a class="chip" href="#entrainement/exercice/${w.exerciseId}">↓ ${esc(byId[w.exerciseId]?.name ?? w.exerciseId)} · ${Math.round(w.durationSec / 60)} min</a>`).join(' ')}</p>
+      ${useAdapted && !adapted.changes.length ? '<p class="subtle">Rien à adapter pour l’instant : vos séances, records et courbatures guideront les prochaines.</p>' : ''}
       ${p.adult ? `<button class="primary" id="start" ${s.activeSession ? 'disabled' : ''}>Commencer la séance</button>`
         : `<p><a href="#profil">Complétez votre profil et la déclaration de pratique</a> pour commencer.</p>`}
     </section>
@@ -69,6 +80,7 @@ function overview(ctx, app, chosenGoal) {
   <div class="notice">Commencez en dessous de vos possibilités, dans un espace dégagé. Arrêtez en cas de douleur, de vertige ou de malaise ; une douleur thoracique ou un essoufflement inhabituel demande une aide médicale. Ces séances ne remplacent pas un accompagnement individuel.</div>
   <section class="panel"><h2>Historique</h2>${history(s)}</section>`);
   app.querySelectorAll('[data-goal]').forEach(b => b.onclick = () => ctx.go('entrainement/' + b.dataset.goal));
+  app.querySelectorAll('[data-plan]').forEach(b => b.onclick = () => { ctx.rawPlan = b.dataset.plan === 'raw'; ctx.render(); });
   $('#follow')?.addEventListener('click', () => { s.program = {id: prog.id, startedAt: new Date().toISOString()}; ctx.save(); notify('Programme suivi.'); ctx.render(); });
   $('#leave')?.addEventListener('click', () => { if (confirm('Quitter ce programme ? L’historique est conservé.')) { s.program = null; ctx.save(); ctx.render(); } });
   $('#start')?.addEventListener('click', () => {

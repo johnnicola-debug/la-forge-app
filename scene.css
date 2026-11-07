@@ -272,3 +272,32 @@ body.voie-foudre .hero .kicker::after, body.voie-racine .hero .kicker::after, bo
 .body-board figure { margin: 0; min-width: 0; } .body-board figcaption { font-size: .8rem; letter-spacing: .08em; text-transform: uppercase; opacity: .7; margin-bottom: 6px; }
 .bb-top { list-style: none; padding: 0; margin: 8px 0 0; display: grid; gap: 4px; } .bb-top i { display: inline-block; width: 12px; height: 12px; border-radius: 50%; margin-right: 8px; } .bb-top small { margin-left: 6px; opacity: .6; }
 @media (max-width: 760px) { .body-board, .bm-wrap { grid-template-columns: 1fr; } }
+
+/* Séance adaptée : cartes visuelles. */
+.adapt-switch { display: flex; gap: 6px; flex-wrap: wrap; margin: 6px 0 10px; } .adapt-switch [aria-pressed="true"] { border-color: var(--voie, #d8b25e); color: var(--voie, #d8b25e); }
+.plan-cards { list-style: none; padding: 0; margin: 8px 0; display: grid; gap: 8px; }
+.plan-card { display: grid; grid-template-columns: 74px minmax(0, 1fr); gap: 12px; align-items: center; padding: 6px; border: 1px solid var(--line); border-radius: 8px; }
+.pc-thumb { display: block; height: 70px; border-radius: 6px; background: rgba(255,255,255,.03); } .pc-thumb .inkloop { --ink-fig: #e6dfcf; }
+.pc-body { display: grid; gap: 2px; min-width: 0; } .pc-body > a { font-weight: 600; text-decoration: none; color: inherit; } .pc-dose { font: 600 1.35rem/1.1 var(--serif); color: var(--voie, #d8b25e); }
+.ad-chip { display: inline-flex; gap: 6px; align-items: baseline; font-size: .78rem; padding: 2px 8px; border-radius: 999px; border: 1px solid var(--line); width: fit-content; max-width: 100%; }
+.ad-chip b { font-size: .95rem; } .ad-plus b, .ad-record b { color: #5fc39b; } .ad-moins b { color: #e0a15c; } .ad-remplace b, .ad-retire b { color: #f0735a; } .ad-voie b { color: var(--voie, #d8b25e); }
+.plan-mini { display: flex; flex-wrap: wrap; gap: 6px; margin: 4px 0; }
+
+/* Composer une séance. */
+.composer { display: grid; gap: 14px; }
+.cp-head { display: flex; flex-wrap: wrap; gap: 10px 16px; align-items: center; } .cp-head #cp-name { flex: 1 1 220px; font: 600 1.4rem var(--serif); }
+.cp-time b { font: 600 2rem/1 var(--serif); color: var(--voie, #d8b25e); } .cp-actions { display: flex; gap: 8px; }
+.cp-blocks { list-style: none; padding: 0; margin: 0; display: grid; gap: 8px; }
+.cp-block { display: grid; grid-template-columns: 64px minmax(0, 1.4fr) repeat(3, auto) auto; gap: 10px; align-items: center; padding: 6px 8px; border: 1px solid var(--line); border-radius: 8px; }
+.cp-thumb { display: block; height: 60px; } .cp-name { display: grid; min-width: 0; font-weight: 600; } .cp-warn { color: #e0a15c; font-weight: 400; font-size: .75rem; }
+.cp-dose { display: inline-grid; grid-template-columns: auto auto auto; grid-template-rows: auto auto; align-items: center; justify-items: center; column-gap: 4px; }
+.cp-dose b { font: 600 1.3rem/1 var(--serif); font-variant-numeric: tabular-nums; } .cp-dose small { grid-column: 2; grid-row: 2; font-size: .65rem; opacity: .7; }
+.cp-dose button { grid-row: 1 / span 2; padding: 2px 9px; } .cp-move { display: flex; gap: 4px; } .cp-move button { padding: 2px 7px; }
+.cp-empty { opacity: .7; padding: 14px; border: 1px dashed var(--line); border-radius: 8px; text-align: center; }
+.cp-filters { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; } .cp-filters [aria-pressed="true"] { border-color: var(--voie, #d8b25e); color: var(--voie, #d8b25e); }
+.cp-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(118px, 1fr)); gap: 8px; }
+.cp-card { display: grid; gap: 4px; padding: 6px; text-align: center; font-size: .8rem; position: relative; } .cp-card svg { height: 72px; width: 100%; --ink-fig: #e6dfcf; }
+.cp-card .cp-warn { position: absolute; top: 4px; right: 6px; } .cp-card:hover { border-color: var(--voie, #d8b25e); }
+.cp-saved { display: grid; gap: 6px; } .cp-saved-item { display: flex; justify-content: space-between; align-items: center; gap: 10px; padding: 8px 10px; border: 1px solid var(--line); border-radius: 8px; }
+.cp-saved-item small { display: block; opacity: .7; } .cp-saved-item span:last-child { display: flex; gap: 6px; }
+@media (max-width: 760px) { .cp-block { grid-template-columns: 56px minmax(0, 1fr) auto; } .cp-block .cp-dose:nth-of-type(3), .cp-block .cp-dose:nth-of-type(4) { grid-column: auto; } .cp-move { grid-column: 1 / -1; justify-content: flex-end; } }

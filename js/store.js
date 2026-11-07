@@ -61,6 +61,11 @@ export const validGesture = g => g && str(g.id, 80) && str(g.name, 100) && STYLE
     && ANGLES.every(a => Number.isFinite(k.pose?.angles?.[a]) && Math.abs(k.pose.angles[a]) <= 200)
     && (k.pose.d3 === undefined || (k.pose.d3 && typeof k.pose.d3 === 'object' && Object.values(k.pose.d3).every(Number.isFinite))));
 
+// Séance composée librement (Entraînement > Composer).
+export const validCustom = c => c && str(c.id, 80) && str(c.name, 80) && isDate(c.createdAt) && arr(c.blocks, 20) && c.blocks.length > 0
+  && c.blocks.every(b => str(b.exerciseId, 80) && Number.isInteger(b.sets) && b.sets >= 1 && b.sets <= 10 && optNum(b.restSec ?? 0, 0, 600)
+    && ((Number.isInteger(b.reps) && b.reps >= 1 && b.reps <= 200) || (Number.isFinite(b.durationSec) && b.durationSec >= 5 && b.durationSec <= 1800)));
+
 export function validMethod(m) {
   return m && str(m.id, 80) && str(m.name, 100) && isDate(m.createdAt) && ['creation', 'adaptation', 'hybride'].includes(m.origin?.type)
     && (m.origin.sources === undefined || (arr(m.origin.sources, 3) && m.origin.sources.every(x => str(x.id, 40) && optNum(x.weight, 0, 1))))
@@ -90,7 +95,8 @@ export function validState(s) {
     && arr(s.workshop?.methods, 50) && s.workshop.methods.every(validMethod)
     && s.sharing && Object.keys(SHARE_KEYS).every(k => s.sharing[k] in SHARE_LEVELS)
     && validSkills(s.skills) && validOrientation(s.orientation)
-    && s.avatar && typeof s.avatar === 'object' && str(s.avatar.emblem ?? '', 30) && str(s.avatar.title ?? '', 60);
+    && s.avatar && typeof s.avatar === 'object' && str(s.avatar.emblem ?? '', 30) && str(s.avatar.title ?? '', 60)
+    && (s.custom === undefined || (arr(s.custom, 30) && s.custom.every(validCustom)));
 }
 
 export function validSkills(sk) {

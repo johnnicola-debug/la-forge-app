@@ -16,6 +16,12 @@ function frameOf(seq) {
   return [((x0 + x1) / 2 - w / 2).toFixed(0), (y0 - pad).toFixed(0), w.toFixed(0), h.toFixed(0)];
 }
 
+// Image fixe du mouvement (milieu du geste), pour les vignettes.
+export function stillInk(seq, u = 0.5) {
+  const [vx, vy, vw, vh] = frameOf(seq);
+  return `<svg class="inkloop" viewBox="${vx} ${vy} ${vw} ${vh}" aria-hidden="true"><line x1="${vx}" x2="${Number(vx) + Number(vw)}" y1="${GROUND}" y2="${GROUND}" class="ink-ground"/><g class="ink-fig">${inkFigure(computeJoints(samplePose(seq, u).pose, GROUND))}</g></svg>`;
+}
+
 export function mountInk(host, seq, {speed = 1, label = ''} = {}) {
   const [vx, vy, vw, vh] = frameOf(seq);
   host.innerHTML = `<svg class="inkloop" viewBox="${vx} ${vy} ${vw} ${vh}" role="img" aria-label="${esc(label || 'Animation du mouvement')}">

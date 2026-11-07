@@ -101,6 +101,20 @@ export const EXERCISE_MOTION = {
   'marche-retour-calme': ['mvt-marche'], 'etirements-doux': ['mvt-etirement']
 };
 
+// Zones du corps surtout sollicitées par chaque mouvement type (pour la carte du corps et l'adaptation des séances).
+export const MOTION_ZONES = {
+  'mvt-squat': ['cuisses-avant', 'fessiers', 'genoux'], 'mvt-fente': ['cuisses-avant', 'fessiers', 'genoux'], 'mvt-pompe': ['poitrine', 'epaules', 'bras', 'poignets'],
+  'mvt-pompe-mur': ['poitrine', 'epaules', 'bras', 'poignets'], 'mvt-traction': ['haut-dos', 'bras', 'epaules', 'poignets'], 'mvt-suspension': ['epaules', 'poignets', 'bras'],
+  'mvt-rowing': ['haut-dos', 'bras', 'bas-dos'], 'mvt-tirage-ventre': ['haut-dos', 'bas-dos'], 'mvt-dips': ['bras', 'epaules', 'poitrine', 'poignets'],
+  'mvt-charniere': ['cuisses-arriere', 'fessiers', 'bas-dos'], 'mvt-pont': ['fessiers', 'cuisses-arriere', 'bas-dos'], 'mvt-planche': ['abdos', 'epaules'],
+  'mvt-dead-bug': ['abdos'], 'mvt-chaise': ['cuisses-avant', 'genoux'], 'mvt-grimpeur': ['abdos', 'epaules', 'poignets', 'hanches'], 'mvt-marche': ['mollets', 'chevilles'],
+  'mvt-course': ['mollets', 'chevilles', 'genoux'], 'mvt-saut': ['mollets', 'chevilles'], 'mvt-cercles-bras': ['epaules'], 'mvt-balancier': ['hanches'],
+  'mvt-assis-ouverture': ['hanches'], 'mvt-fente-basse': ['hanches'], 'mvt-ischios': ['cuisses-arriere'], 'mvt-chevilles': ['chevilles', 'mollets'],
+  'mvt-rotations': ['haut-dos'], 'mvt-chat-vache': ['bas-dos', 'haut-dos'], 'mvt-equilibre': ['chevilles', 'hanches'], 'mvt-respiration': [], 'mvt-etirement': ['cuisses-arriere', 'bas-dos'],
+  'direct-avant': ['epaules', 'bras'], 'direct-arriere': ['epaules', 'bras'], 'pas-glisse': ['mollets', 'chevilles'], 'esquive-laterale': ['cuisses-avant', 'bas-dos']
+};
+export const zonesOf = exerciseId => MOTION_ZONES[EXERCISE_MOTION[exerciseId]?.[0]] ?? [];
+
 const all = () => [...motions, ...sequences];
 export function motionFor(exerciseId) {
   const m = EXERCISE_MOTION[exerciseId];
