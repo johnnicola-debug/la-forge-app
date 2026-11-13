@@ -57,13 +57,17 @@ export function computeJoints(pose, ground = 280) {
 }
 
 const smooth = t => t * t * (3 - 2 * t);
+// Rythmes de transition vers une clé (champ facultatif « ease » de la clé d'arrivée). Sans précision : « doux », comme toujours.
+export const EASES = {doux: smooth, lineaire: t => t, vif: t => 1 - (1 - t) ** 3, retenu: t => t ** 3};
+export const easing = name => Object.hasOwn(EASES, name ?? '') ? EASES[name] : smooth;
 export const lerp = (a, b, t) => a + (b - a) * t;
 
-export function interpolatePose(p, q, t) {
-  const s = smooth(Math.min(1, Math.max(0, t)));
+export function interpolatePose(p, q, t, ease) {
+  const s = easing(ease)(Math.min(1, Math.max(0, t)));
   const angles = {};
   for (const k of ANGLE_KEYS) angles[k] = lerp(p.angles[k] ?? 0, q.angles[k] ?? 0, s);
   const out = {x: lerp(p.x ?? 0, q.x ?? 0, s), lift: lerp(p.lift ?? 0, q.lift ?? 0, s), angles};
+  if (p.z !== undefined || q.z !== undefined) out.z = lerp(p.z ?? 0, q.z ?? 0, s);   // déplacement latéral (3D)
   if (p.d3?.face !== undefined || q.d3?.face !== undefined) out.d3 = {face: lerp(p.d3?.face ?? 0, q.d3?.face ?? 0, s)};   // rotation complète (vue 2D)
   return out;
 }
@@ -79,7 +83,7 @@ export function samplePose(seq, u) {
     const k = seq.keys[i];
     if (t <= k.ms || i === seq.keys.length - 1) {
       const local = k.ms ? Math.min(1, t / k.ms) : 1;
-      return {pose: interpolatePose(seq.keys[i - 1].pose, k.pose, local), phase: local < 0.5 ? i - 1 : i};
+      return {pose: interpolatePose(seq.keys[i - 1].pose, k.pose, local, k.ease), phase: local < 0.5 ? i - 1 : i};
     }
     t -= k.ms;
   }

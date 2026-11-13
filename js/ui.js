@@ -22,8 +22,8 @@ export const landscape = () => `<svg class="landscape" viewBox="0 0 560 190" ari
 <rect x="0" y="120" width="560" height="70" fill="url(#mist)"/></svg>`;
 
 export function page(title, body) {
-  return `<div class="top"><span class="crumb">${esc(title)}</span><span>Version locale 0.4 · prototype</span></div>${body}
-<footer>LA FORGE 0.4 · prototype local. Contenus et séances : propositions éditoriales non validées par un entraîneur, un médecin ou un biomécanicien.
+  return `<div class="top"><span class="crumb">${esc(title)}</span><span>Version locale 0.5 · prototype</span></div>${body}
+<footer>LA FORGE 0.5 · prototype local. Contenus et séances : propositions éditoriales non validées par un entraîneur, un médecin ou un biomécanicien.
 Les animations sont des illustrations. Aucun niveau martial n’est certifié ; aucune donnée n’est envoyée.</footer>`;
 }
 

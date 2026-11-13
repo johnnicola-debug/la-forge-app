@@ -13,13 +13,15 @@ import {$, esc, page, fmtDate, notify} from '../ui.js';
 const EL_STATUS = {'a-explorer': 'À explorer', 'en-travail': 'En travail', retenu: 'Retenu', ecarte: 'Écarté'};
 const now = () => new Date().toISOString();
 const exById = Object.fromEntries(exercises.map(e => [e.id, e]));
-const seqName = (id, m) => sequences.find(s => s.id === id)?.name ?? m?.gestures?.find(g => g.id === id)?.name ?? id;
-const motions = m => [...sequences, ...(m.gestures ?? [])];
+let extra = [];   // « Mes mouvements » (modèle commun) : utilisables dans les enchaînements de toutes les méthodes
+const seqName = (id, m) => sequences.find(s => s.id === id)?.name ?? m?.gestures?.find(g => g.id === id)?.name ?? extra.find(x => x.id === id)?.name ?? id;
+const motions = m => [...sequences, ...(m.gestures ?? []), ...extra];
 const ORIGIN = m => m.origin.type === 'hybride' ? `Style hybride : ${m.origin.discipline}` : m.origin.type === 'adaptation' ? `Adaptation de ${m.origin.discipline || 'une discipline'}` : 'Création progressive';
 
 export function render(ctx, app, [id, sub, gid]) {
+  extra = ctx.state.movements ?? [];
   const m = ctx.state.workshop.methods.find(x => x.id === id);
-  if (m && sub === 'geste') return gesture.render(ctx, app, m, gid);
+  if (m && sub === 'geste') return gesture.render(ctx, app, gesture.methodTarget(m), gid);
   return m ? method(ctx, app, m) : list(ctx, app);
 }
 

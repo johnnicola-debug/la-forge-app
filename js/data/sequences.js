@@ -145,3 +145,9 @@ export const sequences = [
 ];
 
 export const sequenceById = id => sequences.find(s => s.id === id);
+
+// Dimension de chaque séquence dans « Mon style » (modèle de mouvement commun : engine/movement.js).
+export const SEQUENCE_DIMENSION = {garde: 'garde', 'escrime-garde': 'garde', 'pas-glisse': 'deplacement', 'pas-arriere': 'deplacement',
+  'direct-avant': 'attaque', 'direct-arriere': 'attaque', crochet: 'attaque', 'gyaku-zuki': 'attaque', 'coup-pied-avant': 'attaque', teep: 'attaque',
+  'coup-pied-retourne': 'attaque', 'escrime-fente': 'attaque', 'esquive-laterale': 'defense', 'escrime-parade-riposte': 'defense', sprawl: 'defense',
+  'chute-arriere': 'defense', 'changement-niveau': 'transition'};

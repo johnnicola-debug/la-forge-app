@@ -222,7 +222,7 @@ function wirePanel(ctx, app, sel) {
 
 // ——— Vue liste : chaque branche se lit comme des chaînes (une compétence, puis celles qui la prolongent) ———
 function listHtml(s, status, sel, keys) {
-  const item = (k, depth) => `<li class="tl-item st-${status[k.id].stage} ${k.id === sel ? 'sel' : ''}" style="--d:${depth}">
+  const item = (k, depth) => `<li class="tl-item st-${status[k.id].stage} ${k.id === sel ? 'sel' : ''}" data-css="--d:${depth}">
     <a href="#arbre/${k.id}" data-node="${k.id}"><i class="tl-dot"></i><span>${depth ? '↳ ' : ''}${esc(k.name)}</span></a>
     <small>${STAGE_LABEL[status[k.id].stage]}${status[k.id].mastery ? ` · niveau ${ROMAN[status[k.id].mastery]}` : ''}${keys.has(k.id) ? ' · clé de votre voie' : ''}</small></li>`;
   const chains = br => {
@@ -235,5 +235,5 @@ function listHtml(s, status, sel, keys) {
   const methods = s.workshop.methods.filter(m => m.elements.length);
   return `<div class="tree-list">${branches.filter(b => skills.some(k => k.branch === b.id)).map(b => `<section class="panel tl-branch"><h2>${esc(b.name)}</h2><ol class="tl">${chains(b)}</ol></section>`).join('')}
     ${methods.length ? `<section class="panel tl-branch mine"><h2>Mes méthodes</h2>${methods.map(m => { const {cols} = levels(m.elements);
-      return `<h3><a href="#atelier/${m.id}">${esc(m.name)}</a></h3><ol class="tl">${cols.flatMap((col, d) => col.filter(e => e.status !== 'ecarte').map(e => `<li class="tl-item own st-${e.status}" style="--d:${Math.min(d, 4)}"><a href="#atelier/${m.id}"><i class="tl-dot"></i><span>${d ? '↳ ' : ''}${esc(e.ref ? entryById[e.ref]?.title ?? e.label : e.label)}</span></a></li>`)).join('')}</ol>`; }).join('')}</section>` : ''}</div>`;
+      return `<h3><a href="#atelier/${m.id}">${esc(m.name)}</a></h3><ol class="tl">${cols.flatMap((col, d) => col.filter(e => e.status !== 'ecarte').map(e => `<li class="tl-item own st-${e.status}" data-css="--d:${Math.min(d, 4)}"><a href="#atelier/${m.id}"><i class="tl-dot"></i><span>${d ? '↳ ' : ''}${esc(e.ref ? entryById[e.ref]?.title ?? e.label : e.label)}</span></a></li>`)).join('')}</ol>`; }).join('')}</section>` : ''}</div>`;
 }

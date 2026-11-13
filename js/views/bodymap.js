@@ -48,7 +48,7 @@ export function bodyBoard(sessions, now = Date.now()) {
   const top = Object.entries(sore).sort((a, b) => b[1].heat - a[1].heat).slice(0, 4);
   return `<section class="panel ink body-board">
     <div class="bb-map"><figure><figcaption>◍ Carte du corps · 4 semaines</figcaption>${bodyMapSvg({heat, label: 'Courbatures déclarées sur 4 semaines'})}</figure>
-      ${top.length ? `<ul class="bb-top">${top.map(([z, o]) => `<li><i style="background:rgba(224,90,64,${(0.25 + o.heat * 0.7).toFixed(2)})"></i>${esc(ZONES[z])}<small>${o.count}×</small></li>`).join('')}</ul>` : '<p class="subtle">Signalez vos courbatures au bilan de séance : la carte se colorera.</p>'}</div>
+      ${top.length ? `<ul class="bb-top">${top.map(([z, o]) => `<li><i data-css="background:rgba(224,90,64,${(0.25 + o.heat * 0.7).toFixed(2)})"></i>${esc(ZONES[z])}<small>${o.count}×</small></li>`).join('')}</ul>` : '<p class="subtle">Signalez vos courbatures au bilan de séance : la carte se colorera.</p>'}</div>
     <figure class="bb-load"><figcaption>⚖ Charge par semaine (effort × minutes)</figcaption>
       <svg class="chart" viewBox="0 0 ${W} ${H + 22}" role="img" aria-label="Charge d’entraînement par semaine">
         ${load.map((w, i) => { const h = w.load / max * H * 0.9; return `<rect class="bar ${i === load.length - 1 ? 'now' : ''}" x="${i * bw + 5}" y="${H - h}" width="${bw - 10}" height="${Math.max(h, w.load ? 2 : 0)}" rx="3"><title>${dm(w.start)} : ${w.load}</title></rect>

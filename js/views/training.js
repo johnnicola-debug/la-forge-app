@@ -118,7 +118,6 @@ function runner(ctx, app) {
   const draw = () => {
     if (isOver(r)) { exitTatami(); return bilan(ctx, app, r); }
     const step = r.steps[r.index], ex = byId[step.exerciseId], rem = remaining(r, Date.now());
-    announce(step, ex);
     if (ctx.tatami) return drawTatami(step, ex, rem);
     const doneCount = r.log.filter(Boolean).length;
     app.innerHTML = page('Séance en cours', `
@@ -160,22 +159,16 @@ function runner(ctx, app) {
     showMotion($('#ex-anim'), step);
     updateClock();
   };
-  // ——— Mode mains libres (« tatami ») : lisible à 3 m, grandes zones tactiles, clavier, voix et écran gardé allumé ———
-  let spoken = -1, lock = null;
-  const say = text => { if (ctx.tatamiVoice === false || !('speechSynthesis' in window)) return; try { speechSynthesis.cancel(); const u = new SpeechSynthesisUtterance(text); u.lang = 'fr-FR'; u.rate = 1.02; speechSynthesis.speak(u); } catch { /* voix indisponible */ } };
-  function announce(step, ex) {
-    if (!ctx.tatami || spoken === r.index) return;
-    spoken = r.index;
-    say(step.kind === 'repos' ? `Repos. Ensuite : ${byId[r.steps[r.index + 1]?.exerciseId]?.name ?? 'fin'}.` : `${ex?.name ?? ''}. ${step.kind === 'travail' ? `Série ${step.set} sur ${step.sets}. ` : ''}${step.reps ? `${step.reps} répétitions.` : step.durationSec ? `${step.durationSec} secondes.` : ''}`);
-  }
+  // ——— Mode mains libres (« tatami ») : lisible à 3 m, grandes zones tactiles, clavier, signaux sonores et écran gardé allumé ———
+  let lock = null;
   const keepAwake = async () => { try { lock = await navigator.wakeLock?.request('screen'); } catch { lock = null; } };
-  const exitTatami = () => { ctx.tatami = false; spoken = -1; try { lock?.release(); speechSynthesis?.cancel(); } catch { /* rien à libérer */ } lock = null; };
+  const exitTatami = () => { ctx.tatami = false; try { lock?.release(); } catch { /* rien à libérer */ } lock = null; };
   function drawTatami(step, ex, rem) {
     const total = step.durationSec ?? null, upcoming = r.steps[r.index + 1];
     const icon = {preparation: '↑', travail: '●', repos: '◌', 'retour-au-calme': '↓'}[step.kind];
     app.innerHTML = `<div class="tatami ${step.kind}" id="tatami-view">
       <div class="tt-top"><span>${icon} ${KIND[step.kind]}</span><span>${r.index + 1} / ${r.steps.length}</span>
-        <span><button id="tt-voice" aria-pressed="${ctx.tatamiVoice !== false}">♪ Voix</button><button id="tt-exit" aria-label="Quitter le mode mains libres">✕</button></span></div>
+        <span><button id="tt-exit" aria-label="Quitter le mode mains libres">✕</button></span></div>
       <h1 class="tt-name">${step.kind === 'repos' ? 'Repos' : esc(ex?.name ?? step.exerciseId)}</h1>
       ${step.kind === 'travail' ? `<div class="tt-sets">${Array.from({length: step.sets}, (_, i) => `<i class="${i < step.set - 1 ? 'done' : i === step.set - 1 ? 'now' : ''}"></i>`).join('')}</div>` : '<div class="tt-sets"></div>'}
       <div class="tt-stage"><div class="tt-anim" id="tt-anim"></div><div class="tt-clock"><svg viewBox="0 0 200 200" aria-hidden="true"><circle class="tt-track" cx="100" cy="100" r="88"/><circle class="tt-ring" id="ttring" cx="100" cy="100" r="88" pathLength="1" stroke-dasharray="1" stroke-dashoffset="${total && rem !== null ? 1 - rem / total : 1}"/></svg>
@@ -191,7 +184,6 @@ function runner(ctx, app) {
     $('#tt-done').onclick = () => set(next0());
     $('#tt-back').onclick = () => set(previous(r, Date.now()));
     $('#tt-exit').onclick = () => { exitTatami(); draw(); };
-    $('#tt-voice').onclick = () => { ctx.tatamiVoice = ctx.tatamiVoice === false; draw(); };
     showMotion($('#tt-anim'), step);
     updateClock();
   }
@@ -224,7 +216,7 @@ function runner(ctx, app) {
     $('#ttring')?.setAttribute('stroke-dashoffset', rem !== null && step.durationSec ? String(1 - rem / step.durationSec) : '1');
     $('#active').textContent = fmtClock(Math.floor(activeElapsed(r, now) / 1000));
     if (r.running && rem === 0) { beep(step.kind === 'repos' ? 880 : 520); set(next(r, now, {done: true})); return; }
-    if (r.running && rem !== null && rem <= 3 && rem > 0 && rem !== tick) { tick = rem; beep(440, 80); if (ctx.tatami) say(String(rem)); }
+    if (r.running && rem !== null && rem <= 3 && rem > 0 && rem !== tick) { tick = rem; beep(440, 80); }
     if (r.running && now - lastSave > 5000) persist();
   };
   const iv = setInterval(updateClock, 250);

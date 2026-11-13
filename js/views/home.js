@@ -1,20 +1,10 @@
-// Le seuil : scène d'entrée (silhouette à l'encre dans un paysage en couches), puis le parcours personnel.
-import {programs} from '../data/programs.js';
-import {entries} from '../data/library.js';
-import {skills, branches} from '../data/skills.js';
-import {exercises} from '../data/exercises.js';
-import {sequenceById} from '../data/sequences.js';
-import {VOIES, VOIE_IDS} from '../data/orientation.js';
-import {computeAll, branchSummary} from '../engine/progress.js';
-import {suggestedGoal} from '../engine/assistant.js';
-import {nextTemplate, fitTemplate} from '../engine/coach.js';
+// Accueil : scène d'entrée (silhouette à l'encre, puis corps d'ombre en 3D) et les trois portes de l'atelier.
+import {sequenceById, sequences} from '../data/sequences.js';
 import {samplePose, computeJoints, sequenceDuration} from '../engine/skeleton.js';
 import {inkFigure} from '../engine/render.js';
-import {index} from './tree.js';
-import {sigil} from './orientation.js';
 import {compose} from '../engine/compose.js';
-import {sequences} from '../data/sequences.js';
-import {$, esc, page, fmtDate} from '../ui.js';
+import {SPACES} from '../nav.js';
+import {$, esc, page} from '../ui.js';
 
 const SCENE_SEQ = ['garde', 'direct-avant', 'garde', 'pas-glisse', 'coup-pied-avant'];
 // Combat d'ombres de l'accueil (3D) : le corps d'ombre enchaîne des gestes de plusieurs disciplines.
@@ -38,33 +28,15 @@ function sceneSvg(fig) {
 export function render(ctx, app) {
   document.body.classList.add('scene');
   ctx.cleanup.push(() => document.body.classList.remove('scene'));
-  const s = ctx.state, p = s.profile, o = s.orientation;
-  const status = computeAll(skills, s, index), sum = branchSummary(skills, status);
-  const goal = suggestedGoal(s), prog = programs.find(x => x.id === s.program?.id) ?? programs.find(x => x.goalId === goal) ?? programs[0];
-  const tpl = nextTemplate(prog, s.sessions), fit = fitTemplate(tpl, p.minutes);
-  const pose = j => inkFigure(j);
-  const frame = (seq, u) => pose(computeJoints(samplePose(sequenceById(seq), u).pose, 280));
-  app.innerHTML = page('Le seuil', `
+  const s = ctx.state, name = s.profile.name;
+  const frame = (seq, u) => inkFigure(computeJoints(samplePose(sequenceById(seq), u).pose, 280));
+  app.innerHTML = page('Accueil', `
   <section class="seuil">${sceneSvg(frame('garde', 0))}<div class="seuil-3d" id="seuil-3d" aria-hidden="true"></div>
-    <div class="seuil-text"><span class="kicker">Votre dojo numérique</span><h1>La pratique devient une voie<span class="dot">.</span></h1>
-    <p class="intro">${p.name ? `${esc(p.name)}, ` : ''}entraînez votre corps, comprenez la pratique martiale, et forgez peu à peu un style qui vous ressemble.</p>
-    <div class="actions">${o ? `<a class="button primary" href="#entrainement/${prog.goalId}">Reprendre l’entraînement</a><a class="button" href="#inventer">✧ Inventer une technique</a>`
-      : `<a class="button primary" href="#orientation">Entrer dans la forge</a><a class="button" href="#inventer">✧ Inventer une technique</a>`}</div></div>
+    <div class="seuil-text"><span class="kicker">Atelier du mouvement martial</span><h1>Donnez forme au mouvement<span class="dot">.</span></h1>
+    <p class="intro">${name ? `${esc(name)}, observez` : 'Observez'} un geste sous tous les angles, décomposez un combat, créez vos propres mouvements et assemblez-les en un style personnel.</p></div>
   </section>
-  <div class="split">
-    <section class="panel ink"><h2>Prochaine séance</h2><p class="serif">${esc(prog.name)} · Séance ${esc(tpl.id)} — ${esc(tpl.title)}</p>
-      <p><strong>≈ ${Math.round(fit.seconds / 60)} min</strong> · ${esc(tpl.focus)}</p>
-      ${s.activeSession ? '<a class="button primary" href="#entrainement/seance">Reprendre la séance en cours</a>' : `<a class="button primary" href="#entrainement/${prog.goalId}">Préparer la séance</a>`}
-      <p class="subtle">${s.program ? `Programme suivi depuis le ${fmtDate(s.program.startedAt)}.` : o ? 'Proposé d’après votre orientation.' : 'Proposition par défaut : faites l’orientation pour l’ajuster.'}</p></section>
-    <section class="panel ink"><h2>Votre création</h2><p class="serif">${s.workshop.methods.length ? `${s.workshop.methods.length} méthode(s) en cours dans l’atelier` : 'Aucune méthode pour l’instant'}</p>
-      <p class="subtle">Comparez deux disciplines dans la forge, puis composez votre propre style dans l’atelier.</p>
-      <a class="button primary" href="#forge">Ouvrir la forge</a></section>
-  </div>
-  <section class="panel"><div class="head"><h2>Votre arbre</h2><a href="#arbre">Ouvrir l’arbre →</a></div>
-    <div class="branch-bars">${branches.filter(b => sum[b.id]).map(b => { const c = sum[b.id], eng = c.pratique + c.evalue + c.maitrise;
-      return `<a href="#arbre" class="bb"><span>${esc(b.name)}</span><span class="bar"><i data-w="${eng / c.total}"></i></span><small>${eng} / ${c.total} engagés${c.maitrise ? ` · ${c.maitrise} constaté(s)` : ''}</small></a>`; }).join('')}</div></section>
-  <div class="grid">${VOIE_IDS.map(v => `<a class="panel voie-tile" href="#voies">${sigil(v, 72, o ? o.affinities[v] : .6)}<h3>${esc(VOIES[v].name)}</h3><p class="subtle">${esc(VOIES[v].essence)}</p></a>`).join('')}</div>`);
-  app.querySelectorAll('.bar i').forEach(i => requestAnimationFrame(() => i.style.width = `${Number(i.dataset.w) * 100}%`));
+  <div class="doors" role="navigation" aria-label="Les trois espaces">${SPACES.map(d => `<a class="door" href="#${d.id}"><span class="door-ico" aria-hidden="true">${d.icon}</span><b>${d.label}</b><small>${d.hint}</small>${d.soon ? '<em class="soon">bientôt</em>' : ''}</a>`).join('')}</div>
+  ${s.activeSession ? '<p class="home-note">Une séance d’entraînement est en cours — <a href="#entrainement/seance">▶ la reprendre</a></p>' : ''}`);
   // Animation lente de la silhouette (désactivée si l'utilisateur réduit les animations).
   if (matchMedia('(prefers-reduced-motion: reduce)').matches) return;
   const g = $('.fighter'), host3d = $('#seuil-3d');

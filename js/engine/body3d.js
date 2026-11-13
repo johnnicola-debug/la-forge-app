@@ -3,7 +3,7 @@
 // Les angles du plan de profil sont ceux du moteur 2D (skeleton.js) ; s'y ajoutent des réglages 3D par style :
 // rotation des hanches et des épaules, écartement des jambes et des bras, orientation des pieds.
 // Les poses restent des illustrations choisies à l'œil : aucune contrainte anatomique n'est vérifiée.
-import {SEGMENT_MASS} from './skeleton.js';
+import {SEGMENT_MASS, easing} from './skeleton.js';
 
 // Proportions segmentaires moyennes, en fraction de la taille (Drillis et Contini, reprises par Winter,
 // Biomechanics and Motor Control of Human Movement, 4e éd., 2009, fig. 4.1). Approximation pour un adulte « moyen ».
@@ -44,7 +44,7 @@ export const extrasOf = (seq, pose) => ({...PRESETS[seq?.style] ?? PRESETS.boxe,
 // Articulations en mètres, posées au sol (le point le plus bas des pieds à y = 0, sauf « lift »).
 export function joints3d(pose, dims = bodyDims(), extras = PRESETS.boxe) {
   const a = pose.angles, d = dims, e = {...PRESETS.boxe, ...extras};
-  const pelvis = [(pose.x ?? 0) * d.unit, 0, 0];
+  const pelvis = [(pose.x ?? 0) * d.unit, 0, (pose.z ?? 0) * d.unit];
   const up = sag(180 - a.torso);
   const j = {pelvis, chest: add(pelvis, up, d.torso * 0.8), neckBase: add(pelvis, up, d.torso)};
   j.head = add(j.neckBase, sag(180 - a.torso - (a.neck ?? 0)), d.neck + d.head);
@@ -65,7 +65,7 @@ export function joints3d(pose, dims = bodyDims(), extras = PRESETS.boxe) {
       [side + 'Knee']: knee, [side + 'Ankle']: ankle, [side + 'Toe']: toe, [side + 'Heel']: heel, [side + 'FootDir']: flat});
   }
   // Rotation de tout le corps autour de l'axe vertical du bassin (voltes, techniques retournées).
-  if (e.face) for (const k in j) { const p = j[k]; if (k.endsWith('FootDir')) j[k] = rotY(p, e.face); else { const r = rotY([p[0] - pelvis[0], p[1], p[2]], e.face); j[k] = [pelvis[0] + r[0], r[1], r[2]]; } }
+  if (e.face) for (const k in j) { const p = j[k]; if (k.endsWith('FootDir')) j[k] = rotY(p, e.face); else { const r = rotY([p[0] - pelvis[0], p[1], p[2] - pelvis[2]], e.face); j[k] = [pelvis[0] + r[0], r[1], pelvis[2] + r[2]]; } }
   // Appui : le point le plus bas du corps touche le sol (pieds en général ; mains, genoux, dos ou tête dans le travail au sol).
   const R = {head: d.head * 0.85, leadWrist: d.fist * 0.75, rearWrist: d.fist * 0.75, leadKnee: 0.035 * d.H, rearKnee: 0.035 * d.H, leadElbow: 0.027 * d.H, rearElbow: 0.027 * d.H, pelvis: 0.06 * d.H, chest: 0.07 * d.H};
   const low = Math.min(j.leadHeel[1], j.rearHeel[1], j.leadToe[1], j.rearToe[1], ...Object.entries(R).map(([k, r]) => j[k][1] - r));
@@ -125,6 +125,6 @@ export function sample3d(seq, u, samplePose) {
   const {pose, phase} = samplePose(seq, u), keys = seq.keys, total = keys.slice(1).reduce((s, k) => s + k.ms, 0);
   let t = Math.min(1, Math.max(0, u)) * total, i = 1;
   for (; i < keys.length - 1 && t > keys[i].ms; i++) t -= keys[i].ms;
-  const local = keys[i].ms ? Math.min(1, t / keys[i].ms) : 1, s = local * local * (3 - 2 * local);
+  const local = keys[i].ms ? Math.min(1, t / keys[i].ms) : 1, s = easing(keys[i].ease)(local);
   return {pose, phase, extras: lerpExtras(extrasOf(seq, keys[i - 1].pose), extrasOf(seq, keys[i].pose), s)};
 }

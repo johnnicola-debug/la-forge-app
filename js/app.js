@@ -17,12 +17,26 @@ import * as data from './views/data.js';
 import * as map from './views/map.js';
 import * as inventer from './views/inventer.js';
 import * as arena from './views/arena.js';
+import * as visualiser from './views/visualiser.js';
+import * as analyser from './views/analyser.js';
+import * as creer from './views/creer.js';
+import * as plus from './views/plus.js';
+import {SPACES, spaceOf} from './nav.js';
 import * as sound from './engine/sound.js';
 
-const routes = {carte: map, inventer, reaction: arena, accueil: home, orientation, avatar, profil: profile, entrainement: training, bibliotheque: library, arbre: tree,
+// La politique de sécurité (style-src 'self') bloque l'attribut style : un gabarit écrit data-css="propriété:valeur", posé ici par le CSSOM.
+const applyCss = n => {
+  if (n.nodeType !== 1) return;
+  for (const e of [n, ...n.querySelectorAll('[data-css]')]) { const d = e.dataset?.css, i = d?.indexOf(':') ?? -1; if (i > 0) e.style.setProperty(d.slice(0, i), d.slice(i + 1)); }
+};
+new MutationObserver(list => list.forEach(m => m.addedNodes.forEach(applyCss))).observe($('#app'), {childList: true, subtree: true});
+
+const routes = {visualiser, analyser, creer, plus, carte: map, inventer, reaction: arena, accueil: home, orientation, avatar, profil: profile, entrainement: training, bibliotheque: library, arbre: tree,
   forge, atelier: workshop, voies: ways, guildes: community, donnees: data};
-// Rubrique de navigation mise en évidence pour les sous-pages.
-const navOf = {profil: 'avatar', atelier: 'forge', reaction: 'entrainement'};
+// Menu : les trois espaces, puis « Plus » (tout le reste). Construit une fois, à partir de nav.js.
+$('#mainnav').innerHTML = SPACES.map(d => `<a href="#${d.id}"><span class="ico">${d.icon}</span><span class="nav-text"><b>${d.label}${d.soon ? ' <em class="soon">bientôt</em>' : ''}</b><small>${d.hint}</small></span></a>`).join('')
+  + '<a class="nav-plus" href="#plus"><span class="ico">⋯</span>Plus</a>';
+$('.tabbar').innerHTML = SPACES.map(d => `<a href="#${d.id}"><span>${d.icon}</span>${d.label}</a>`).join('') + '<a href="#plus"><span>⋯</span>Plus</a>';
 
 const loaded = load(localStorage);
 const ctx = {
@@ -51,10 +65,10 @@ function render() {
   for (const fn of ctx.cleanup.splice(0)) fn();
   ctx.onHide = [];
   const [route, ...params] = (location.hash.slice(1) || 'accueil').split('/');
-  const key = routes[route] ? route : 'accueil', nav = navOf[key] ?? key;
+  const key = Object.hasOwn(routes, route) ? route : 'accueil', nav = spaceOf(key);
   $$('#mainnav a, .tabbar a').forEach(a => a.setAttribute('aria-current', a.hash === '#' + nav ? 'page' : 'false'));
-  $('#mainnav').classList.remove('open'); $('#menu-btn').setAttribute('aria-expanded', 'false');
   routes[key].render(ctx, $('#app'), params.map(decodeURIComponent));
+  paintSound();
   refreshMe();
 }
 
@@ -67,11 +81,11 @@ window.addEventListener('hashchange', () => {
 document.addEventListener('visibilitychange', () => { if (document.hidden) for (const fn of ctx.onHide ?? []) fn(); });
 // Sons (coupés par défaut, synthétisés dans le navigateur).
 const paintSound = () => document.querySelectorAll('[data-sound]').forEach(b => b.setAttribute('aria-pressed', String(sound.prefs[b.dataset.sound])));
-document.querySelectorAll('[data-sound]').forEach(b => b.onclick = () => { sound.set(b.dataset.sound, !sound.prefs[b.dataset.sound]); paintSound(); });
+// Les réglages de son vivent dans la page « Plus » : écoute déléguée, état repeint après chaque rendu.
+document.addEventListener('click', e => { const b = e.target.closest?.('[data-sound]'); if (!b) return; sound.set(b.dataset.sound, !sound.prefs[b.dataset.sound]); paintSound(); });
 paintSound();
 if (sound.prefs.ambient) addEventListener('pointerdown', () => sound.startAmbient(), {once: true});   // le navigateur exige un premier geste
 ctx.gong = sound.gong;
-$('#menu-btn').onclick = () => { const open = $('#mainnav').classList.toggle('open'); $('#menu-btn').setAttribute('aria-expanded', String(open)); };
 lastRoute = location.hash.slice(1).split('/')[0];
 render();
 if (loaded.issue === 'migre') notify('Vos données précédentes ont été reprises. Une copie de sécurité a été gardée.');

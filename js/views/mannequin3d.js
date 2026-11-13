@@ -1,5 +1,6 @@
 // Corps d'ombre 3D (Three.js, chargé seulement à la demande) : silhouette sombre éclairée en contre-jour,
 // aux proportions du pratiquant (taille et envergure de « Mon reflet »), animée par le moteur 3D (engine/body3d.js).
+// Lecture image par image, squelette et second mouvement en comparaison : pilotables après le montage (fonctions renvoyées).
 // Caméra libre (souris ou doigt), vues fixes, vue à la première personne et vue de l'adversaire.
 // Les poses sont des illustrations choisies à l'œil ; le centre de masse est une approximation segmentaire.
 import {samplePose, keyPositions, sequenceDuration} from '../engine/skeleton.js';
@@ -29,18 +30,21 @@ export function dimsFromState(state) {
 const VIEWS = {'Trois-quarts': [2.2, 1.35, 2.2], Profil: [0.25, 1.05, 3.1], Face: [3.1, 1.15, 0.05], Dessus: [0.25, 3.8, 0.3], 'Première personne': null, Adversaire: null};
 
 // `seqId` : identifiant d'une séquence du moteur, ou séquence composée (objet avec keys). `d3` : réglages 3D imposés (garde hybride).
-export async function mount3d(host, seqId, {muscles = [], glow = [], dims = bodyDims(), compact = false, d3 = null, transparent = false, height = null, loop = false, minimal = false, opponent = false} = {}) {
+export async function mount3d(host, seqId, {muscles = [], glow = [], dims = bodyDims(), compact = false, d3 = null, transparent = false, height = null, loop = false, minimal = false, opponent = false, autoplay = false} = {}) {
   const THREE = await import('../../vendor/three/three.module.min.js');
   const {OrbitControls} = await import('../../vendor/three/OrbitControls.js');
-  const seq = typeof seqId === 'object' ? seqId : sequenceById(seqId), keys = keyPositions(seq), H = dims.H;
+  let seq = typeof seqId === 'object' ? seqId : sequenceById(seqId), keys = keyPositions(seq);
+  const H = dims.H, steps = () => `${seq.keys.map((k, i) => `<button data-key="${i}" aria-pressed="${i === 0}">${esc(k.label)}</button>`).join('')}<span class="bar"></span>`;
+  // Vues et options d'affichage : repliées sous « Affichage » dans le lecteur complet, inchangées dans la vue épurée.
+  const viewBtns = `<span class="views">${Object.keys(VIEWS).map(v => `<button data-view="${v}" aria-pressed="${v === 'Trois-quarts'}">${v}</button>`).join('')}</span>`;
+  const toggles = `<label><input type="checkbox" data-act="skeleton"> Squelette</label><label><input type="checkbox" data-act="ghosts" checked> Fantômes</label><label><input type="checkbox" data-act="com" checked> Centre de masse</label>
+    <label><input type="checkbox" data-act="zones" ${muscles.length ? 'checked' : ''}> Zones sollicitées</label>`;
   host.innerHTML = `<div class="m3d ${compact ? 'compact' : ''} ${minimal ? 'minimal' : ''}"><div class="m3d-canvas"></div>
-    ${compact ? '' : `<div class="timeline">${seq.keys.map((k, i) => `<button data-key="${i}" aria-pressed="${i === 0}">${esc(k.label)}</button>`).join('')}<span class="bar"></span></div>
-    <div class="controls"><button data-act="prev" aria-label="Phase précédente">◀</button><button data-act="play">${loop ? 'Pause' : 'Lire'}</button><button data-act="next" aria-label="Phase suivante">▶</button>
+    ${compact ? '' : `<div class="timeline">${steps()}</div>
+    <div class="controls"><button data-act="prev" title="Étape précédente" aria-label="Étape précédente">«</button><button data-act="back" title="Image précédente" aria-label="Image précédente">‹</button><button data-act="play">${loop || autoplay ? 'Pause' : 'Lire'}</button><button data-act="fwd" title="Image suivante" aria-label="Image suivante">›</button><button data-act="next" title="Étape suivante" aria-label="Étape suivante">»</button>
       <label>Vitesse <select data-act="speed"><option value="0.1">× 0,1</option><option value="0.25">× 0,25</option><option value="0.5" selected>× 0,5</option><option value="1">× 1</option></select></label>
-      <input type="range" min="0" max="1000" value="0" data-act="scrub" aria-label="Position dans le mouvement">
-      <span class="views">${Object.keys(VIEWS).map(v => `<button data-view="${v}" aria-pressed="${v === 'Trois-quarts'}">${v}</button>`).join('')}</span>
-      <label><input type="checkbox" data-act="ghosts" checked> Fantômes</label><label><input type="checkbox" data-act="com" checked> Centre de masse</label>
-      <label><input type="checkbox" data-act="zones" ${muscles.length ? 'checked' : ''}> Zones sollicitées</label></div>
+      <input type="range" min="0" max="1000" value="0" data-act="scrub" aria-label="Position dans le mouvement"><output class="m3d-time"></output>
+      ${minimal ? viewBtns + toggles : `<details class="m3d-more"><summary>Affichage</summary><div class="m3d-opts">${viewBtns}${toggles}</div></details>`}</div>
     <p class="subtle cue"></p>
     <p class="subtle m3d-note">Faites glisser pour tourner autour, molette ou pincement pour zoomer. Corps aux proportions ${dims.known?.height ? `de votre taille (${dims.known.height} cm)${dims.known.span ? ` et envergure (${dims.known.span} cm)` : ''}` : 'moyennes (renseignez taille et envergure dans Mon reflet)'}.</p>`}</div>`;
   const box = $('.m3d-canvas', host), size = () => { const W = box.clientWidth || 640; return [W, height ?? Math.round(compact ? Math.min(420, W * 1.15) : Math.min(480, W * 0.64))]; };
@@ -121,24 +125,74 @@ export async function mount3d(host, seqId, {muscles = [], glow = [], dims = body
     }
   }
   const main = makeFigure(matBody, false);
-  const ghosts = compact ? [] : seq.keys.map(k => { const g = makeFigure(matGhost, true); pose(g, joints3d(k.pose, dims, extrasOf(seq, k.pose)), extrasOf(seq, k.pose)); return g; });
+  // Fantômes : une silhouette par pose clé (seize au plus, pour que les longs mouvements restent lisibles et fluides).
+  const makeGhosts = () => { if (compact) return []; const n = seq.keys.length, every = Math.ceil(n / 16);
+    return seq.keys.filter((_, i) => i % every === 0 || i === n - 1).map(k => { const g = makeFigure(matGhost, true), e = extrasOf(seq, k.pose); pose(g, joints3d(k.pose, dims, e), e); return g; }); };
+  let ghosts = makeGhosts(), second = null, skelOn = false;
 
   if (minimal) ghosts.forEach(g => { g.visible = false; });
   if (opponent) {   // adversaire-cible : garde de boxe, face au pratiquant, à 1,6 m devant le point de départ
     const guard = sequenceById('garde').keys[0].pose, op = {...guard, x: 1.6 / dims.unit, d3: {face: 180}};
     pose(makeFigure(new THREE.MeshStandardMaterial({color: '#8a6a5e', transparent: true, opacity: 0.28, depthWrite: false}), true), joints3d(op, dims, extrasOf({}, op)), extrasOf({}, op));
   }   // vue épurée (Creuset) : le geste seul, avec son équilibre
+  // Squelette : segments et articulations tracés par-dessus le corps rendu translucide, pour lire les angles et les appuis.
+  const BONES = [['pelvis', 'chest'], ['chest', 'neckBase'], ['neckBase', 'head'], ['leadShoulder', 'rearShoulder'], ['leadHip', 'rearHip'],
+    ...['lead', 'rear'].flatMap(s => [['Shoulder', 'Elbow'], ['Elbow', 'Wrist'], ['Hip', 'Knee'], ['Knee', 'Ankle'], ['Ankle', 'Heel'], ['Heel', 'Toe']].map(([a, b]) => [s + a, s + b]))];
+  const boneGeo = new THREE.CylinderGeometry(1, 1, 1, 8);
+  function makeSkeleton(color, dot) {
+    const g = new THREE.Group(), over = c => new THREE.MeshBasicMaterial({color: c, depthTest: false, transparent: true}), mb = over(color), mj = over(dot);
+    const bones = BONES.map(([a, b]) => { const m = new THREE.Mesh(boneGeo, mb); m.renderOrder = 9; g.add(m); return [m, a, b]; });
+    const dots = [...new Set(BONES.flat())].map(k => { const m = new THREE.Mesh(sph, mj); m.scale.setScalar(r(.011)); m.renderOrder = 10; g.add(m); return [m, k]; });
+    g.userData = {bones, dots}; g.visible = false; scene.add(g); return g;
+  }
+  function poseSkeleton(g, j) {
+    for (const [m, a, b] of g.userData.bones) { const A = V(j[a]), d = V(j[b]).sub(A), len = d.length(); m.position.copy(A).addScaledVector(d, 0.5); m.quaternion.setFromUnitVectors(up, d.normalize()); m.scale.set(r(.005), len || 1e-6, r(.005)); }
+    for (const [m, k] of g.userData.dots) m.position.copy(V(j[k]));
+  }
+  const skel = makeSkeleton('#8fe3c8', '#ffffff');
+  function setSkeleton(on) {
+    skelOn = Boolean(on); skel.visible = skelOn; if (second) second.skel.visible = skelOn && Boolean(second.seq);
+    for (const m of [matBody, matZone, mat2]) { m.transparent = skelOn; m.opacity = skelOn ? 0.22 : 1; m.depthWrite = !skelOn; m.needsUpdate = true; }
+    const cb = $('[data-act=skeleton]', host); if (cb) cb.checked = skelOn;
+    update();
+  }
+  // Second mouvement (comparaison) : joué sur le même temps relatif, superposé (« sur »), à côté (« cote ») ou en face (« face »).
+  const mat2 = new THREE.MeshStandardMaterial({color: '#2f6f8f', roughness: 0.6});
+  function setSecond(next, place = 'sur') {
+    if (compact) return;
+    const wasFace = second?.place === 'face';
+    if (next) {
+      second ??= {fig: makeFigure(mat2, true), skel: makeSkeleton('#7fb8e0', '#dcefff')};
+      second.seq = typeof next === 'object' ? next : sequenceById(next); second.place = place;
+      const [x, z, turn] = place === 'face' ? [1.6, 0, Math.PI] : place === 'cote' ? [0, -0.9, 0] : [0, 0, 0];
+      for (const g of [second.fig, second.skel]) { g.position.set(x, 0, z); g.rotation.y = turn; }
+    } else if (second) second.seq = second.place = null;
+    if (second) { second.fig.visible = Boolean(second.seq); second.skel.visible = skelOn && second.fig.visible; }
+    if (wasFace !== (second?.place === 'face') && VIEWS[st.view]) setView(st.view);
+    update();
+  }
+  // Changer de mouvement sans reconstruire la scène : étapes, fantômes et curseur repartent du début.
+  function load(next, play = true) {
+    for (const g of ghosts) { scene.remove(g); g.traverse(o => { if (o.isMesh && o.geometry !== sph && o.geometry !== lathe) o.geometry.dispose(); }); }
+    seq = typeof next === 'object' ? next : sequenceById(next); keys = keyPositions(seq); ghosts = makeGhosts();
+    const cb = $('[data-act=ghosts]', host); if (minimal || (cb && !cb.checked)) ghosts.forEach(g => { g.visible = false; });
+    const tl = $('.timeline', host); if (tl) tl.innerHTML = steps();
+    st.u = 0; st.last = 0; st.playing = compact || loop || play; if (playBtn) playBtn.textContent = st.playing ? 'Pause' : 'Lire';
+    update();
+  }
   // Centre de masse : sphère dorée, fil à plomb, polygone d'appui au sol (vert si le centre est au-dessus, rouge sinon).
   const comBall = new THREE.Mesh(new THREE.SphereGeometry(0.03, 16, 12), new THREE.MeshStandardMaterial({color: '#e2c27a', emissive: '#a07b2c', emissiveIntensity: 0.9}));
   const plumb = new THREE.Line(new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(), new THREE.Vector3()]), new THREE.LineDashedMaterial({color: '#e2c27a', dashSize: 0.03, gapSize: 0.03}));
   const polyMat = new THREE.LineBasicMaterial({color: '#5fc39b'}), poly = new THREE.LineLoop(new THREE.BufferGeometry(), polyMat);
   const comGroup = new THREE.Group(); comGroup.add(comBall, plumb, poly); comGroup.visible = !compact; scene.add(comGroup);
 
-  const st = {u: 0, speed: compact ? 0.35 : 0.5, playing: compact || loop, last: 0, view: 'Trois-quarts', j: null};
-  const cue = $('.cue', host), scrub = $('[data-act=scrub]', host), playBtn = $('[data-act=play]', host);
+  const st = {u: 0, speed: compact ? 0.35 : 0.5, playing: compact || loop || autoplay, last: 0, view: 'Trois-quarts', j: null};
+  const cue = $('.cue', host), scrub = $('[data-act=scrub]', host), playBtn = $('[data-act=play]', host), timeEl = $('.m3d-time', host);
   function update() {
     const s3 = sample3d(seq, st.u, samplePose), p = s3.pose, phase = s3.phase, extras = d3 ? {...s3.extras, ...d3} : s3.extras, j = joints3d(p, dims, extras);
     st.j = j; st.face = extras.face ?? 0; pose(main, j, extras);
+    if (skelOn) poseSkeleton(skel, j);
+    if (second?.seq) { const s2 = sample3d(second.seq, st.u, samplePose), j2 = joints3d(s2.pose, dims, s2.extras); pose(second.fig, j2, s2.extras); if (skelOn) poseSkeleton(second.skel, j2); }
     const c = centerOfMass3d(j), pg = supportPolygon(j, dims);
     comBall.position.set(c[0], c[1], c[2]);
     plumb.geometry.setFromPoints([comBall.position.clone(), new THREE.Vector3(c[0], 0.003, c[2])]); plumb.computeLineDistances();
@@ -148,6 +202,7 @@ export async function mount3d(host, seqId, {muscles = [], glow = [], dims = body
     if (compact) return;
     host.querySelectorAll('[data-key]').forEach(b => b.setAttribute('aria-pressed', String(Number(b.dataset.key) === phase)));
     $('.bar', host).style.width = `${st.u * 100}%`; scrub.value = Math.round(st.u * 1000);
+    timeEl.textContent = `${(st.u * sequenceDuration(seq) / 1000).toFixed(2).replace('.', ',')} s`;
     cue.innerHTML = `<strong>${esc(seq.keys[phase].label)}</strong> · ${esc(seq.keys[phase].cue ?? '')}`;
   }
   // Vues : fixes (caméra libre ensuite), première personne (depuis les yeux, vers la cible) et adversaire (face au pratiquant).
@@ -164,7 +219,7 @@ export async function mount3d(host, seqId, {muscles = [], glow = [], dims = body
     st.view = v; const fixed = VIEWS[v];
     controls.enabled = Boolean(fixed); main.userData.vols.head.visible = main.userData.vols.neck.visible = v !== 'Première personne';
     // Avec un adversaire, la caméra se recule et vise entre les deux corps.
-    const cx = opponent ? 0.8 : 0.15, k = opponent ? 1.35 : 1;
+    const wide = opponent || second?.place === 'face', cx = wide ? 0.8 : 0.15, k = wide ? 1.35 : 1;
     if (fixed) { camera.position.set(...fixed.map((x, i) => i === 1 ? x * H / 1.75 : i === 0 ? cx + (x - 0.15) * k : x * k)); controls.target.set(cx, 0.95 * H / 1.75, 0); controls.update(); } else follow();
     host.querySelectorAll('[data-view]').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.view === v)));
   };
@@ -187,13 +242,16 @@ export async function mount3d(host, seqId, {muscles = [], glow = [], dims = body
     if (b.dataset.view) setView(b.dataset.view);
     const act = b.dataset.act;
     if (act === 'play') { if (st.playing) { st.playing = false; b.textContent = 'Lire'; } else { if (st.u >= 1) st.u = 0; st.playing = true; st.last = 0; b.textContent = 'Pause'; } }
+    // Image par image : un pas vaut 1/30 de seconde du mouvement.
+    if (act === 'back' || act === 'fwd') { st.playing = false; playBtn.textContent = 'Lire'; st.u = Math.min(1, Math.max(0, st.u + (act === 'fwd' ? 1 : -1) * (1000 / 30) / (sequenceDuration(seq) || 1))); update(); }
     if (act === 'prev' || act === 'next') { const ph = samplePose(seq, st.u).phase, i = Math.max(0, Math.min(keys.length - 1, ph + (act === 'next' ? 1 : -1))); st.u = keys[i]; update(); }
   });
   const onInput = e => {
     const a = e.target.dataset.act;
-    if (a === 'scrub') { st.playing = false; st.u = Number(e.target.value) / 1000; update(); }
+    if (a === 'scrub') { st.playing = false; playBtn.textContent = 'Lire'; st.u = Number(e.target.value) / 1000; update(); }
     if (a === 'speed') st.speed = Number(e.target.value);
     if (a === 'ghosts') ghosts.forEach(g => g.visible = e.target.checked);
+    if (a === 'skeleton') setSkeleton(e.target.checked);
     if (a === 'com') comGroup.visible = e.target.checked;
     if (a === 'zones') main.traverse(m => { if (m.isMesh) m.material = e.target.checked && zoneParts.has(m.userData.part) ? matZone : matBody; });
   };
@@ -201,5 +259,7 @@ export async function mount3d(host, seqId, {muscles = [], glow = [], dims = body
   const ro = new ResizeObserver(() => { const [W, Hh] = size(); renderer.setSize(W, Hh); camera.aspect = W / Hh; camera.updateProjectionMatrix(); });
   ro.observe(box);
   update(); raf = requestAnimationFrame(frame);
-  return () => { alive = false; cancelAnimationFrame(raf); ro.disconnect(); controls.dispose(); renderer.dispose(); scene.traverse(o => { o.geometry?.dispose?.(); }); };
+  const stop = () => { alive = false; cancelAnimationFrame(raf); ro.disconnect(); controls.dispose(); renderer.dispose(); scene.traverse(o => { o.geometry?.dispose?.(); }); };
+  // Le lecteur reste pilotable après le montage (espace Visualiser).
+  return Object.assign(stop, {setSequence: load, setSecond, setSkeleton});
 }

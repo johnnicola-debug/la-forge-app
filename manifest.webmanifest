@@ -1,7 +1,7 @@
 {
-  "name": "LA FORGE — Dojo numérique",
+  "name": "LA FORGE — Atelier du mouvement martial",
   "short_name": "LA FORGE",
-  "description": "Entraîner son corps, comprendre la pratique martiale et forger son propre style. Fonctionne hors ligne ; les données restent sur l'appareil.",
+  "description": "Atelier numérique du mouvement martial : visualiser un geste en 3D et créer ses propres mouvements. Fonctionne hors ligne ; les données restent sur l'appareil.",
   "lang": "fr",
   "start_url": "./",
   "scope": "./",

@@ -2,6 +2,7 @@
 // Rien n'est envoyé au serveur ; tout reste dans le navigateur (localStorage).
 
 import {validBody} from './engine/body.js';
+import {validMovement} from './engine/movement.js';
 export const VERSION = 3;
 export const KEY = 'la-forge.v3', KEY_V2 = 'la-forge.v2', KEY_V1 = 'la-forge.v1', BACKUP_KEY = 'la-forge.copies';
 export const LIMIT = 1000;
@@ -96,7 +97,8 @@ export function validState(s) {
     && s.sharing && Object.keys(SHARE_KEYS).every(k => s.sharing[k] in SHARE_LEVELS)
     && validSkills(s.skills) && validOrientation(s.orientation)
     && s.avatar && typeof s.avatar === 'object' && str(s.avatar.emblem ?? '', 30) && str(s.avatar.title ?? '', 60)
-    && (s.custom === undefined || (arr(s.custom, 30) && s.custom.every(validCustom)));
+    && (s.custom === undefined || (arr(s.custom, 30) && s.custom.every(validCustom)))
+    && (s.movements === undefined || (arr(s.movements, 300) && s.movements.every(validMovement)));
 }
 
 export function validSkills(sk) {
