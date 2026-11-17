@@ -5,6 +5,7 @@
 // Les poses sont des illustrations choisies à l'œil ; le centre de masse est une approximation segmentaire.
 import {samplePose, keyPositions, sequenceDuration} from '../engine/skeleton.js';
 import {bodyDims, joints3d, extrasOf, sample3d, centerOfMass3d, supportPolygon, insideMargin} from '../engine/body3d.js';
+import {HANDLES, dragPlane, solve} from '../engine/posing.js';
 import {sequenceById} from '../data/sequences.js';
 import {$, esc} from '../ui.js';
 
@@ -30,7 +31,8 @@ export function dimsFromState(state) {
 const VIEWS = {'Trois-quarts': [2.2, 1.35, 2.2], Profil: [0.25, 1.05, 3.1], Face: [3.1, 1.15, 0.05], Dessus: [0.25, 3.8, 0.3], 'Première personne': null, Adversaire: null};
 
 // `seqId` : identifiant d'une séquence du moteur, ou séquence composée (objet avec keys). `d3` : réglages 3D imposés (garde hybride).
-export async function mount3d(host, seqId, {muscles = [], glow = [], dims = bodyDims(), compact = false, d3 = null, transparent = false, height = null, loop = false, minimal = false, opponent = false, autoplay = false} = {}) {
+// `edit` : atelier de mouvement ({onSelect, onPart, onChange, onCommit}) ; l'étape montrée se modifie en attrapant ses poignées.
+export async function mount3d(host, seqId, {muscles = [], glow = [], dims = bodyDims(), compact = false, d3 = null, transparent = false, height = null, loop = false, minimal = false, opponent = false, autoplay = false, edit = null} = {}) {
   const THREE = await import('../../vendor/three/three.module.min.js');
   const {OrbitControls} = await import('../../vendor/three/OrbitControls.js');
   let seq = typeof seqId === 'object' ? seqId : sequenceById(seqId), keys = keyPositions(seq);
@@ -39,7 +41,7 @@ export async function mount3d(host, seqId, {muscles = [], glow = [], dims = body
   const viewBtns = `<span class="views">${Object.keys(VIEWS).map(v => `<button data-view="${v}" aria-pressed="${v === 'Trois-quarts'}">${v}</button>`).join('')}</span>`;
   const toggles = `<label><input type="checkbox" data-act="skeleton"> Squelette</label><label><input type="checkbox" data-act="ghosts" checked> Fantômes</label><label><input type="checkbox" data-act="com" checked> Centre de masse</label>
     <label><input type="checkbox" data-act="zones" ${muscles.length ? 'checked' : ''}> Zones sollicitées</label>`;
-  host.innerHTML = `<div class="m3d ${compact ? 'compact' : ''} ${minimal ? 'minimal' : ''}"><div class="m3d-canvas"></div>
+  host.innerHTML = `<div class="m3d ${compact ? 'compact' : ''} ${minimal ? 'minimal' : ''} ${edit ? 'edit' : ''}"><div class="m3d-canvas"></div>
     ${compact ? '' : `<div class="timeline">${steps()}</div>
     <div class="controls"><button data-act="prev" title="Étape précédente" aria-label="Étape précédente">«</button><button data-act="back" title="Image précédente" aria-label="Image précédente">‹</button><button data-act="play">${loop || autoplay ? 'Pause' : 'Lire'}</button><button data-act="fwd" title="Image suivante" aria-label="Image suivante">›</button><button data-act="next" title="Étape suivante" aria-label="Étape suivante">»</button>
       <label>Vitesse <select data-act="speed"><option value="0.1">× 0,1</option><option value="0.25">× 0,25</option><option value="0.5" selected>× 0,5</option><option value="1">× 1</option></select></label>
@@ -47,7 +49,7 @@ export async function mount3d(host, seqId, {muscles = [], glow = [], dims = body
       ${minimal ? viewBtns + toggles : `<details class="m3d-more"><summary>Affichage</summary><div class="m3d-opts">${viewBtns}${toggles}</div></details>`}</div>
     <p class="subtle cue"></p>
     <p class="subtle m3d-note">Faites glisser pour tourner autour, molette ou pincement pour zoomer. Corps aux proportions ${dims.known?.height ? `de votre taille (${dims.known.height} cm)${dims.known.span ? ` et envergure (${dims.known.span} cm)` : ''}` : 'moyennes (renseignez taille et envergure dans Mon reflet)'}.</p>`}</div>`;
-  const box = $('.m3d-canvas', host), size = () => { const W = box.clientWidth || 640; return [W, height ?? Math.round(compact ? Math.min(420, W * 1.15) : Math.min(480, W * 0.64))]; };
+  const box = $('.m3d-canvas', host), size = () => { const W = box.clientWidth || 640; return [W, height ?? Math.round(compact ? Math.min(420, W * 1.15) : Math.min(edit ? 540 : 480, W * (edit ? 0.7 : 0.64)))]; };
   const [w, h] = size();
   const renderer = new THREE.WebGLRenderer({antialias: true, alpha: transparent});
   renderer.setPixelRatio(Math.min(2, devicePixelRatio)); renderer.setSize(w, h); renderer.shadowMap.enabled = true; renderer.shadowMap.type = THREE.PCFSoftShadowMap;
@@ -126,8 +128,8 @@ export async function mount3d(host, seqId, {muscles = [], glow = [], dims = body
   }
   const main = makeFigure(matBody, false);
   // Fantômes : une silhouette par pose clé (seize au plus, pour que les longs mouvements restent lisibles et fluides).
-  const makeGhosts = () => { if (compact) return []; const n = seq.keys.length, every = Math.ceil(n / 16);
-    return seq.keys.filter((_, i) => i % every === 0 || i === n - 1).map(k => { const g = makeFigure(matGhost, true), e = extrasOf(seq, k.pose); pose(g, joints3d(k.pose, dims, e), e); return g; }); };
+  const makeGhosts = (only = null) => { if (compact) return []; const n = seq.keys.length, every = Math.ceil(n / 16);
+    return seq.keys.filter((_, i) => only ? only.includes(i) : i % every === 0 || i === n - 1).map(k => { const g = makeFigure(matGhost, true), e = extrasOf(seq, k.pose); pose(g, joints3d(k.pose, dims, e), e); return g; }); };
   let ghosts = makeGhosts(), second = null, skelOn = false;
 
   if (minimal) ghosts.forEach(g => { g.visible = false; });
@@ -150,6 +152,12 @@ export async function mount3d(host, seqId, {muscles = [], glow = [], dims = body
     for (const [m, k] of g.userData.dots) m.position.copy(V(j[k]));
   }
   const skel = makeSkeleton('#8fe3c8', '#ffffff');
+  // Poignées de l'atelier : dorées pour déplacer une extrémité (poing, pied, tête, buste, bassin), vertes pour faire tourner
+  // un segment autour de son attache (coude, genou). Toujours visibles par-dessus le corps.
+  const handles = edit ? Object.entries(HANDLES).map(([name, h]) => {
+    const color = h.small ? '#5fc39b' : '#e2c27a', m = new THREE.Mesh(sph, new THREE.MeshBasicMaterial({color, depthTest: false, transparent: true, opacity: 0.95}));
+    m.renderOrder = 12; m.visible = false; m.userData = {name, joint: h.joint, color, base: r(h.small ? 0.016 : 0.022)}; scene.add(m); return m;
+  }) : [];
   function setSkeleton(on) {
     skelOn = Boolean(on); skel.visible = skelOn; if (second) second.skel.visible = skelOn && Boolean(second.seq);
     for (const m of [matBody, matZone, mat2]) { m.transparent = skelOn; m.opacity = skelOn ? 0.22 : 1; m.depthWrite = !skelOn; m.needsUpdate = true; }
@@ -172,10 +180,14 @@ export async function mount3d(host, seqId, {muscles = [], glow = [], dims = body
     update();
   }
   // Changer de mouvement sans reconstruire la scène : étapes, fantômes et curseur repartent du début.
-  function load(next, play = true) {
+  function rebuildGhosts() {
     for (const g of ghosts) { scene.remove(g); g.traverse(o => { if (o.isMesh && o.geometry !== sph && o.geometry !== lathe) o.geometry.dispose(); }); }
-    seq = typeof next === 'object' ? next : sequenceById(next); keys = keyPositions(seq); ghosts = makeGhosts();
+    // Atelier : pendant qu'on modifie une étape, seulement l'étape d'avant et celle d'après (pelure d'oignon).
+    ghosts = makeGhosts(st.edit !== null && !st.playing ? [st.edit - 1, st.edit + 1] : null);
     const cb = $('[data-act=ghosts]', host); if (minimal || (cb && !cb.checked)) ghosts.forEach(g => { g.visible = false; });
+  }
+  function load(next, play = true) {
+    seq = typeof next === 'object' ? next : sequenceById(next); keys = keyPositions(seq); st.edit = null; rebuildGhosts();
     const tl = $('.timeline', host); if (tl) tl.innerHTML = steps();
     st.u = 0; st.last = 0; st.playing = compact || loop || play; if (playBtn) playBtn.textContent = st.playing ? 'Pause' : 'Lire';
     update();
@@ -186,11 +198,18 @@ export async function mount3d(host, seqId, {muscles = [], glow = [], dims = body
   const polyMat = new THREE.LineBasicMaterial({color: '#5fc39b'}), poly = new THREE.LineLoop(new THREE.BufferGeometry(), polyMat);
   const comGroup = new THREE.Group(); comGroup.add(comBall, plumb, poly); comGroup.visible = !compact; scene.add(comGroup);
 
-  const st = {u: 0, speed: compact ? 0.35 : 0.5, playing: compact || loop || autoplay, last: 0, view: 'Trois-quarts', j: null};
+  const st = {u: 0, speed: compact ? 0.35 : 0.5, playing: compact || loop || autoplay, last: 0, view: 'Trois-quarts', j: null, edit: null, part: null, hover: null, drag: null};
   const cue = $('.cue', host), scrub = $('[data-act=scrub]', host), playBtn = $('[data-act=play]', host), timeEl = $('.m3d-time', host);
   function update() {
-    const s3 = sample3d(seq, st.u, samplePose), p = s3.pose, phase = s3.phase, extras = d3 ? {...s3.extras, ...d3} : s3.extras, j = joints3d(p, dims, extras);
+    // Étape en cours de modification (atelier) : sa pose exacte, sans interpolation, avec ses poignées.
+    const ek = st.edit !== null && !st.playing ? seq.keys[st.edit] : null;
+    const s3 = ek ? {pose: ek.pose, phase: st.edit, extras: extrasOf(seq, ek.pose)} : sample3d(seq, st.u, samplePose);
+    const p = s3.pose, phase = s3.phase, extras = d3 ? {...s3.extras, ...d3} : s3.extras, j = joints3d(p, dims, extras);
     st.j = j; st.face = extras.face ?? 0; pose(main, j, extras);
+    for (const m of handles) {
+      const {name, joint, base, color} = m.userData, sel = name === st.part; m.visible = Boolean(ek);
+      if (ek) { m.position.copy(V(j[joint])); m.scale.setScalar(base * (sel ? 1.55 : name === st.hover ? 1.3 : 1)); m.material.color.set(sel ? '#ffffff' : color); }
+    }
     if (skelOn) poseSkeleton(skel, j);
     if (second?.seq) { const s2 = sample3d(second.seq, st.u, samplePose), j2 = joints3d(s2.pose, dims, s2.extras); pose(second.fig, j2, s2.extras); if (skelOn) poseSkeleton(second.skel, j2); }
     const c = centerOfMass3d(j), pg = supportPolygon(j, dims);
@@ -241,14 +260,15 @@ export async function mount3d(host, seqId, {muscles = [], glow = [], dims = body
     if (b.dataset.key) { st.playing = false; playBtn.textContent = 'Lire'; st.u = keys[Number(b.dataset.key)]; update(); }
     if (b.dataset.view) setView(b.dataset.view);
     const act = b.dataset.act;
-    if (act === 'play') { if (st.playing) { st.playing = false; b.textContent = 'Lire'; } else { if (st.u >= 1) st.u = 0; st.playing = true; st.last = 0; b.textContent = 'Pause'; } }
+    if (act === 'play') { if (st.playing) { st.playing = false; b.textContent = 'Lire'; } else { leaveEdit(); if (st.u >= 1) st.u = 0; st.playing = true; st.last = 0; b.textContent = 'Pause'; } }
     // Image par image : un pas vaut 1/30 de seconde du mouvement.
-    if (act === 'back' || act === 'fwd') { st.playing = false; playBtn.textContent = 'Lire'; st.u = Math.min(1, Math.max(0, st.u + (act === 'fwd' ? 1 : -1) * (1000 / 30) / (sequenceDuration(seq) || 1))); update(); }
-    if (act === 'prev' || act === 'next') { const ph = samplePose(seq, st.u).phase, i = Math.max(0, Math.min(keys.length - 1, ph + (act === 'next' ? 1 : -1))); st.u = keys[i]; update(); }
+    if (act === 'back' || act === 'fwd') { leaveEdit(); st.playing = false; playBtn.textContent = 'Lire'; st.u = Math.min(1, Math.max(0, st.u + (act === 'fwd' ? 1 : -1) * (1000 / 30) / (sequenceDuration(seq) || 1))); update(); }
+    if (act === 'prev' || act === 'next') { const ph = st.edit ?? samplePose(seq, st.u).phase, i = Math.max(0, Math.min(keys.length - 1, ph + (act === 'next' ? 1 : -1)));
+      if (edit) { editKey(i); edit.onSelect?.(i); } else { st.u = keys[i]; update(); } }
   });
   const onInput = e => {
     const a = e.target.dataset.act;
-    if (a === 'scrub') { st.playing = false; playBtn.textContent = 'Lire'; st.u = Number(e.target.value) / 1000; update(); }
+    if (a === 'scrub') { leaveEdit(); st.playing = false; playBtn.textContent = 'Lire'; st.u = Number(e.target.value) / 1000; update(); }
     if (a === 'speed') st.speed = Number(e.target.value);
     if (a === 'ghosts') ghosts.forEach(g => g.visible = e.target.checked);
     if (a === 'skeleton') setSkeleton(e.target.checked);
@@ -256,10 +276,72 @@ export async function mount3d(host, seqId, {muscles = [], glow = [], dims = body
     if (a === 'zones') main.traverse(m => { if (m.isMesh) m.material = e.target.checked && zoneParts.has(m.userData.part) ? matZone : matBody; });
   };
   host.addEventListener('input', onInput); host.addEventListener('change', e => { if (e.target.type === 'checkbox') onInput(e); });
+  // Atelier de mouvement : l'étape choisie est montrée telle quelle ; on attrape une poignée pour la modifier
+  // (cinématique inverse : engine/posing.js). Un glissement qui ne part pas d'une poignée fait toujours tourner la caméra.
+  function leaveEdit() { if (st.edit === null) return; st.edit = null; st.hover = null; rebuildGhosts(); update(); edit?.onSelect?.(null); }
+  function editKey(i, rebuild = false) {
+    if (!edit) return;
+    const k = Math.max(0, Math.min(seq.keys.length - 1, i)), changed = st.edit !== k || st.playing;
+    st.playing = false; if (playBtn) playBtn.textContent = 'Lire';
+    keys = keyPositions(seq); st.edit = k; st.u = keys[k] ?? 0;
+    if (changed || rebuild) rebuildGhosts();
+    update();
+  }
+  function select(name) { st.part = name ?? null; update(); }
+  const cvs = renderer.domElement, ray = new THREE.Raycaster(), hit = new THREE.Vector3();
+  // Position d'une poignée à l'écran (pixels de la page) : pour l'attraper, et pour les essais automatiques.
+  function screenOf(name) {
+    const m = handles.find(h => h.userData.name === name); if (!m?.visible) return null;
+    camera.updateMatrixWorld(); const q = m.position.clone().project(camera), b = cvs.getBoundingClientRect();
+    return {x: b.left + (q.x + 1) / 2 * b.width, y: b.top + (1 - q.y) / 2 * b.height};
+  }
+  function pick(e) {
+    if (st.edit === null || st.playing) return null;
+    let best = null, bd = e.pointerType === 'touch' ? 34 : 22;
+    for (const m of handles) { const q = screenOf(m.userData.name), d = q ? Math.hypot(q.x - e.clientX, q.y - e.clientY) : Infinity; if (d < bd) { bd = d; best = m.userData.name; } }
+    return best;
+  }
+  function rayAt(e) {
+    const b = cvs.getBoundingClientRect(); camera.updateMatrixWorld();
+    ray.setFromCamera(new THREE.Vector2((e.clientX - b.left) / b.width * 2 - 1, -(e.clientY - b.top) / b.height * 2 + 1), camera); return ray.ray;
+  }
+  if (edit) {
+    box.addEventListener('pointerdown', e => {
+      if (!e.isPrimary || e.button > 0 || st.drag) return;
+      const name = pick(e); if (!name) return;
+      e.stopPropagation(); e.preventDefault();   // la caméra ne bouge pas : on tient une partie du corps
+      const k = seq.keys[st.edit], ex = extrasOf(seq, k.pose), pl = dragPlane(name, k.pose, ex, dims), r0 = rayAt(e), n = V(pl.normal).normalize();
+      // Plan vu par la tranche : plan face à la caméra (vertical pour le bassin, qui ne fait que glisser sur le sol).
+      if (Math.abs(n.dot(r0.direction)) < 0.25) { camera.getWorldDirection(n); if (HANDLES[name].kind === 'pelvis') { n.y = 0; if (n.lengthSq() < 1e-6) n.set(1, 0, 0); n.normalize(); } }
+      const plane = new THREE.Plane().setFromNormalAndCoplanarPoint(n, V(pl.point));
+      if (!r0.intersectPlane(plane, hit)) return;
+      st.drag = {name, id: e.pointerId, start: JSON.parse(JSON.stringify(k.pose)), ex, plane, offset: V(pl.point).sub(hit), moved: false};
+      controls.enabled = false; try { cvs.setPointerCapture(e.pointerId); } catch {} cvs.style.cursor = 'grabbing';
+      st.part = name; edit.onPart?.(name); update();
+    }, true);
+    box.addEventListener('pointermove', e => {
+      if (!st.drag) { if (e.pointerType === 'mouse') { const h = pick(e); if (h !== st.hover) { st.hover = h; cvs.style.cursor = h ? 'grab' : ''; update(); } } return; }
+      if (e.pointerId !== st.drag.id) return;
+      e.stopPropagation();
+      if (!rayAt(e).intersectPlane(st.drag.plane, hit)) return;
+      const t = hit.add(st.drag.offset);
+      seq.keys[st.edit].pose = solve(st.drag.name, st.drag.start, st.drag.ex, dims, [t.x, t.y, t.z]);
+      st.drag.moved = true; update(); edit.onChange?.(st.edit);
+    }, true);
+    const release = e => {
+      if (!st.drag || e.pointerId !== st.drag.id) return;
+      e.stopPropagation(); const moved = st.drag.moved; st.drag = null;
+      controls.enabled = Boolean(VIEWS[st.view]); cvs.style.cursor = ''; try { cvs.releasePointerCapture(e.pointerId); } catch {}
+      if (moved) edit.onCommit?.(st.edit);
+    };
+    box.addEventListener('pointerup', release, true); box.addEventListener('pointercancel', release, true);
+  }
   const ro = new ResizeObserver(() => { const [W, Hh] = size(); renderer.setSize(W, Hh); camera.aspect = W / Hh; camera.updateProjectionMatrix(); });
   ro.observe(box);
   update(); raf = requestAnimationFrame(frame);
   const stop = () => { alive = false; cancelAnimationFrame(raf); ro.disconnect(); controls.dispose(); renderer.dispose(); scene.traverse(o => { o.geometry?.dispose?.(); }); };
-  // Le lecteur reste pilotable après le montage (espace Visualiser).
-  return Object.assign(stop, {setSequence: load, setSecond, setSkeleton});
+  // Le lecteur reste pilotable après le montage (Visualiser, atelier de mouvement) ; il est aussi rangé sur son conteneur.
+  const api = Object.assign(stop, {setSequence: load, setSecond, setSkeleton, editKey, select, screenOf, redraw: update});
+  host.m3d = api;
+  return api;
 }

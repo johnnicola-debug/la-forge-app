@@ -1,0 +1,95 @@
+// Vérification prudente d'une étape (atelier de mouvement) : amplitudes articulaires, équilibre, vitesse d'arrivée.
+// Des repères pour attirer l'œil, pas un diagnostic. Le mannequin ne connaît ni la souplesse de la personne ni la rotation
+// des bras et des jambes : ses angles sont ceux d'un dessin de profil complété par quelques réglages 3D (body3d.js).
+// Seuils « habituels » : ordres de grandeur des amplitudes moyennes de l'adulte publiées par l'American Academy of
+// Orthopaedic Surgeons (genou ≈ 135°, hanche ≈ 120° en flexion et 30° en extension, abduction de hanche ≈ 45°, coude ≈ 150°,
+// cou ≈ 50°), élargis là où le mannequin simplifie : son buste est d'un seul bloc (la flexion du bas du dos compte avec
+// la hanche), et la cheville en appui se relève plus qu'à vide (≈ 40°). Hanche et cheville sont mesurées en 3D, dans le
+// repère du bassin tourné et du pied orienté. Seuils « très inhabituels » et vitesses : choix prudents propres à cet outil.
+import {joints3d, bodyDims, extrasOf, centerOfMass3d, supportPolygon, insideMargin} from './body3d.js';
+
+// Angles anatomiques en degrés : [habituel min, habituel max] puis [très inhabituel min, très inhabituel max].
+export const RANGES = {
+  knee: {usual: [-5, 145], extreme: [-15, 165]},     // flexion positive, hyperextension négative
+  hip: {usual: [-30, 125], extreme: [-55, 175]},     // cuisse / buste : flexion positive ; genou plié (≥ 45°) : jusqu'à 160° habituels
+  ankle: {usual: [-55, 40], extreme: [-75, 60]},     // pied relevé positif, pointe tendue négative
+  elbow: {usual: [0, 150], extreme: [0, 170]},       // pliure seule (le sens dépend de la rotation du bras, inconnue)
+  neck: {usual: [-55, 60], extreme: [-80, 80]},
+  legAbd: {usual: [-30, 50], extreme: [-45, 95]}     // jambe écartée du bassin sur le côté (négatif : croisée)
+};
+// Vitesse moyenne en ligne droite pour atteindre une étape (sous-estime le trajet réel), en m/s.
+export const SPEEDS = [['leadWrist', 'Poing avant', 10], ['rearWrist', 'Poing arrière', 10], ['leadAnkle', 'Pied avant', 15], ['rearAnkle', 'Pied arrière', 15], ['pelvis', 'Bassin', 6]];
+
+const SIDE = {lead: 'avant', rear: 'arrière'};
+const deg = v => `${Math.round(Math.abs(v))}°`;
+const TEXT = {
+  knee: (v, s) => v < 0 ? `Genou ${s} en hyperextension (${deg(v)})` : `Genou ${s} plié à ${deg(v)}`,
+  hip: (v, s) => v < 0 ? `Hanche ${s} tendue vers l’arrière de ${deg(v)}` : `Hanche ${s} fléchie à ${deg(v)}`,
+  ankle: (v, s) => v < 0 ? `Pointe du pied ${s} tendue de ${deg(v)}` : `Pied ${s} relevé de ${deg(v)}`,
+  elbow: (v, s) => `Coude ${s} plié à ${deg(v)}`,
+  neck: v => v < 0 ? `Tête renversée en arrière de ${deg(v)}` : `Tête penchée en avant de ${deg(v)}`,
+  trunk: v => v < 0 ? `Buste renversé en arrière de ${deg(v)}` : `Buste penché en avant de ${deg(v)}`,
+  legAbd: (v, s) => v < 0 ? `Jambe ${s} croisée de ${deg(v)}` : `Jambe ${s} écartée de ${deg(v)}`
+};
+const R = Math.PI / 180;
+const sag = a => [Math.sin(a * R), -Math.cos(a * R), 0];
+const rotX = ([x, y, z], a) => { const c = Math.cos(a * R), s = Math.sin(a * R); return [x, y * c - z * s, y * s + z * c]; };
+const rotY = ([x, y, z], a) => { const c = Math.cos(a * R), s = Math.sin(a * R); return [x * c + z * s, y, -x * s + z * c]; };
+const dot = (a, b) => a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
+const cross = (a, b) => [a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]];
+const flat = (v, n) => { const k = dot(v, n); return [v[0] - k * n[0], v[1] - k * n[1], v[2] - k * n[2]]; };
+const between = (a, b) => Math.acos(Math.max(-1, Math.min(1, dot(a, b)))) / R;
+
+// Angles anatomiques d'une pose : [articulation, côté, valeur, angle du genou]. Mêmes vecteurs que body3d.js : cuisse et tibia
+// dans le plan de la jambe (écartement), pied orienté vers l'extérieur ; la hanche se lit autour de l'axe du bassin tourné.
+export function anatomy(pose, extras) {
+  const a = pose.angles, lat = rotY([0, 0, 1], extras.turn ?? 0), down = flat(sag(-a.torso), lat), out = [];
+  for (const [s, sgn] of [['lead', 1], ['rear', -1]]) {
+    const abd = extras[s + 'Abd'] ?? 0, shinA = a[s + 'Hip'] - a[s + 'Knee'], thigh = rotX(sag(a[s + 'Hip']), -abd * sgn);
+    const shin = rotX(sag(shinA), -abd * sgn), foot = rotY(sag(shinA + 90 + (a[s + 'Ankle'] ?? 0)), -(extras[s + 'FootOut'] ?? 0) * sgn), t = flat(thigh, lat);
+    out.push(['knee', s, a[s + 'Knee']], ['hip', s, Math.atan2(dot(cross(down, t), lat), dot(down, t)) / R, a[s + 'Knee']],
+      ['legAbd', s, Math.asin(Math.max(-1, Math.min(1, dot(thigh, lat) * sgn))) / R], ['ankle', s, between(shin, foot) - 90], ['elbow', s, Math.abs(a[s + 'Elbow'])]);
+  }
+  out.push(['neck', null, a.neck ?? 0]);
+  return out;
+}
+function judge(kind, side, v, knee) {
+  const {usual: [lo, h0], extreme: [elo, ehi]} = RANGES[kind], hi = kind === 'hip' && knee >= 45 ? 160 : h0;
+  if (v >= lo && v <= hi) return null;
+  const far = v < elo || v > ehi, straight = kind === 'hip' && v > hi && knee < 45 ? ', jambe tendue' : '';
+  return {level: far ? 'alerte' : 'attention', text: `${TEXT[kind](v, SIDE[side])}${straight} : ${far ? 'très ' : ''}au-delà de l’amplitude habituelle (${deg(v < lo ? lo : hi)}).`};
+}
+
+// Équilibre : marge du centre de masse dans le polygone d'appui, en cm (négative : hors des appuis ; −Infinity : aucun appui).
+export function balance(seq, pose, dims = bodyDims()) {
+  const j = joints3d(pose, dims, extrasOf(seq, pose)), c = centerOfMass3d(j);
+  return Math.round(insideMargin(supportPolygon(j, dims), [c[0], c[2]]) * 100);
+}
+
+// Vitesse moyenne de chaque extrémité pour passer de l'étape i − 1 à l'étape i, en m/s.
+export function arrivalSpeeds(seq, i, dims = bodyDims()) {
+  const a = seq.keys[i - 1].pose, b = seq.keys[i].pose, ja = joints3d(a, dims, extrasOf(seq, a)), jb = joints3d(b, dims, extrasOf(seq, b));
+  const s = Math.max(0.001, (seq.keys[i].ms ?? 0) / 1000);
+  return Object.fromEntries(SPEEDS.map(([k]) => [k, Math.hypot(jb[k][0] - ja[k][0], jb[k][1] - ja[k][1], jb[k][2] - ja[k][2]) / s]));
+}
+
+// Remarques sur l'étape i : équilibre (jugé seulement pour les poses tenues, au début et à la fin), amplitudes, vitesse.
+export function checkStep(seq, i, dims = bodyDims()) {
+  const pose = seq.keys[i].pose, notes = [];
+  for (const [kind, side, v, knee] of anatomy(pose, extrasOf(seq, pose))) { const n = judge(kind, side, v, knee); if (n) notes.push(n); }
+  if (i > 0) {
+    const sp = arrivalSpeeds(seq, i, dims);
+    for (const [k, name, lim] of SPEEDS) if (sp[k] > lim) notes.push({level: 'attention',
+      text: `${name} : ${sp[k].toFixed(1).replace('.', ',')} m/s en moyenne pour arriver ici, au-delà de ${lim} m/s : très rapide pour un corps humain. Allongez la durée.`});
+  }
+  const j = joints3d(pose, dims, extrasOf(seq, pose)), c = centerOfMass3d(j), poly = supportPolygon(j, dims), held = i === 0 || i === seq.keys.length - 1;
+  const mg = Math.round(insideMargin(poly, [c[0], c[2]]) * 100), tail = held ? '.' : ' (normal pendant un pas, un saut ou un coup).';
+  const bal = !poly.length || (pose.lift ?? 0) > 0 ? {level: 'info', text: 'En l’air : aucun appui au sol à cet instant.'}
+    : poly.length < 3 ? {level: held ? 'attention' : 'info', text: `Appui trop étroit (un seul point au sol) : la pose ne tient pas immobile${tail}`}
+    : mg >= 2 ? {level: 'ok', text: `Équilibre stable (marge ${mg} cm).`}
+    : mg >= 0 ? {level: 'ok', text: `Équilibre juste (marge ${mg} cm).`}
+    : {level: held ? 'attention' : 'info', text: `Hors d’équilibre si la pose est tenue : le centre de masse dépasse les appuis de ${-mg} cm${tail}`};
+  return {balance: bal, notes};
+}
+const RANK = {ok: 0, info: 0, attention: 1, alerte: 2};
+export const worst = r => [r.balance, ...r.notes].reduce((w, n) => RANK[n.level] > RANK[w] ? n.level : w, 'ok');
