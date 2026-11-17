@@ -4,6 +4,7 @@
 // d'avant en arrière, le bassin glisse sur le sol. Deux segments : cinématique inverse analytique (loi des cosinus) ;
 // le coude et le genou restent pliés du côté où ils l'étaient.
 import {joints3d} from './body3d.js';
+import {twoBone, near, clamp} from './ik.js';
 
 // Poignées : `joint` = articulation sous le doigt ; `small` = poignée qui fait tourner un segment autour de son attache.
 export const HANDLES = {
@@ -26,10 +27,7 @@ const ABD = {arm: 'ArmAbd', upperArm: 'ArmAbd', leg: 'Abd', thigh: 'Abd'};
 const ROOT = {arm: 'Shoulder', upperArm: 'Shoulder', leg: 'Hip', thigh: 'Hip'};
 const rotY = ([x, y, z], a) => { const c = Math.cos(a * D), s = Math.sin(a * D); return [x * c + z * s, y, -x * s + z * c]; };
 const sub = (a, b) => [a[0] - b[0], a[1] - b[1], a[2] - b[2]];
-const clamp = (v, lo, hi) => Math.min(hi, Math.max(lo, v));
 const round = v => Math.round(v * 10) / 10;
-// Angle équivalent le plus proche de la valeur de départ (pas de tour complet parasite), gardé dans [-200°, 200°].
-const near = (a, ref) => { let v = a + 360 * Math.round((ref - a) / 360); if (v > 200) v -= 360; if (v < -200) v += 360; return v; };
 
 // Axe « bas » du plan de travail, dans le repère du corps : incliné vers l'extérieur par l'écartement du membre
 // (même construction que `limb` dans body3d.js), vertical pour la tête et le buste. L'axe « avant » est toujours x.
@@ -38,8 +36,10 @@ const downAxis = (h, extras) => {
   const abd = (extras[h.side + ABD[h.kind]] ?? 0) * D;
   return [0, -Math.cos(abd), SIGN[h.side] * Math.sin(abd)];
 };
+// Une jambe se plie dans un plan tourné comme le genou (leadLegRot / rearLegRot, body3d.js).
+const legYaw = (h, extras) => h.kind === 'leg' || h.kind === 'thigh' ? -(extras[h.side + 'LegRot'] ?? 0) * SIGN[h.side] : 0;
 // Coordonnées (avant, bas) d'un vecteur du monde dans le plan de travail ; direction 0 = bas, 90 = avant, 180 = haut.
-const inPlane = (v, h, extras) => { const l = rotY(v, -(extras.face ?? 0)), d = downAxis(h, extras); return [l[0], l[1] * d[1] + l[2] * d[2]]; };
+const inPlane = (v, h, extras) => { const l = rotY(v, -(extras.face ?? 0) - legYaw(h, extras)), d = downAxis(h, extras); return [l[0], l[1] * d[1] + l[2] * d[2]]; };
 const dirOf = ([f, d]) => Math.atan2(f, d) / D;
 
 // Plan dans lequel la poignée glisse (repère du monde) : celui du membre, le profil pour la tête et le buste, le sol pour le bassin.
@@ -47,14 +47,7 @@ export function dragPlane(name, pose, extras, dims) {
   const h = HANDLES[name], j = joints3d(pose, dims, extras);
   if (h.kind === 'pelvis') return {point: j.pelvis, normal: [0, 1, 0]};
   const d = downAxis(h, extras);   // normale = avant × bas
-  return {point: j[h.joint], normal: rotY([0, -d[2], d[1]], extras.face ?? 0)};
-}
-
-// Deux segments L1, L2 depuis l'attache vers le point (f, d) du plan : direction du point, angle à l'attache, pliure au milieu.
-function twoBone(f, d, L1, L2) {
-  const dist = clamp(Math.hypot(f, d), Math.abs(L1 - L2) + 1e-6, L1 + L2 - 1e-6);
-  return {dir: dirOf([f, d]), at: Math.acos(clamp((L1 * L1 + dist * dist - L2 * L2) / (2 * L1 * dist), -1, 1)) / D,
-    bend: 180 - Math.acos(clamp((L1 * L1 + L2 * L2 - dist * dist) / (2 * L1 * L2), -1, 1)) / D};
+  return {point: j[h.joint], normal: rotY([0, -d[2], d[1]], (extras.face ?? 0) + legYaw(h, extras))};
 }
 
 // Nouvelle pose quand la poignée `name` est amenée au point `target` (monde, mètres). On repart toujours de la pose

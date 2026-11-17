@@ -15,7 +15,9 @@ export const RANGES = {
   ankle: {usual: [-55, 40], extreme: [-75, 60]},     // pied relevé positif, pointe tendue négative
   elbow: {usual: [0, 150], extreme: [0, 170]},       // pliure seule (le sens dépend de la rotation du bras, inconnue)
   neck: {usual: [-55, 60], extreme: [-80, 80]},
-  legAbd: {usual: [-30, 50], extreme: [-45, 95]}     // jambe écartée du bassin sur le côté (négatif : croisée)
+  legAbd: {usual: [-30, 50], extreme: [-45, 95]},    // jambe écartée du bassin sur le côté (négatif : croisée)
+  twist: {usual: [-35, 35], extreme: [-55, 55]},     // genou plié (30° et plus) qui ne pointe pas comme le pied : torsion
+  lean: {usual: [-30, 30], extreme: [-45, 45]}       // buste penché sur le côté
 };
 // Vitesse moyenne en ligne droite pour atteindre une étape (sous-estime le trajet réel), en m/s.
 export const SPEEDS = [['leadWrist', 'Poing avant', 10], ['rearWrist', 'Poing arrière', 10], ['leadAnkle', 'Pied avant', 15], ['rearAnkle', 'Pied arrière', 15], ['pelvis', 'Bassin', 6]];
@@ -29,7 +31,9 @@ const TEXT = {
   elbow: (v, s) => `Coude ${s} plié à ${deg(v)}`,
   neck: v => v < 0 ? `Tête renversée en arrière de ${deg(v)}` : `Tête penchée en avant de ${deg(v)}`,
   trunk: v => v < 0 ? `Buste renversé en arrière de ${deg(v)}` : `Buste penché en avant de ${deg(v)}`,
-  legAbd: (v, s) => v < 0 ? `Jambe ${s} croisée de ${deg(v)}` : `Jambe ${s} écartée de ${deg(v)}`
+  legAbd: (v, s) => v < 0 ? `Jambe ${s} croisée de ${deg(v)}` : `Jambe ${s} écartée de ${deg(v)}`,
+  twist: (v, s) => `Genou ${s} et pied mal alignés (${deg(v)} de torsion du genou)`,
+  lean: v => `Buste penché sur le côté de ${deg(v)}`
 };
 const R = Math.PI / 180;
 const sag = a => [Math.sin(a * R), -Math.cos(a * R), 0];
@@ -43,19 +47,20 @@ const between = (a, b) => Math.acos(Math.max(-1, Math.min(1, dot(a, b)))) / R;
 // Angles anatomiques d'une pose : [articulation, côté, valeur, angle du genou]. Mêmes vecteurs que body3d.js : cuisse et tibia
 // dans le plan de la jambe (écartement), pied orienté vers l'extérieur ; la hanche se lit autour de l'axe du bassin tourné.
 export function anatomy(pose, extras) {
-  const a = pose.angles, lat = rotY([0, 0, 1], extras.turn ?? 0), down = flat(sag(-a.torso), lat), out = [];
+  const a = pose.angles, lat = rotY([0, 0, 1], extras.turn ?? 0), down = flat(rotX(sag(-a.torso), extras.lean ?? 0), lat), out = [];
   for (const [s, sgn] of [['lead', 1], ['rear', -1]]) {
-    const abd = extras[s + 'Abd'] ?? 0, shinA = a[s + 'Hip'] - a[s + 'Knee'], thigh = rotX(sag(a[s + 'Hip']), -abd * sgn);
-    const shin = rotX(sag(shinA), -abd * sgn), foot = rotY(sag(shinA + 90 + (a[s + 'Ankle'] ?? 0)), -(extras[s + 'FootOut'] ?? 0) * sgn), t = flat(thigh, lat);
+    const abd = extras[s + 'Abd'] ?? 0, rot = -(extras[s + 'LegRot'] ?? 0) * sgn, shinA = a[s + 'Hip'] - a[s + 'Knee'], thigh = rotY(rotX(sag(a[s + 'Hip']), -abd * sgn), rot);
+    const shin = rotY(rotX(sag(shinA), -abd * sgn), rot), foot = rotY(sag(shinA + 90 + (a[s + 'Ankle'] ?? 0)), -(extras[s + 'FootOut'] ?? 0) * sgn), t = flat(thigh, lat);
     out.push(['knee', s, a[s + 'Knee']], ['hip', s, Math.atan2(dot(cross(down, t), lat), dot(down, t)) / R, a[s + 'Knee']],
-      ['legAbd', s, Math.asin(Math.max(-1, Math.min(1, dot(thigh, lat) * sgn))) / R], ['ankle', s, between(shin, foot) - 90], ['elbow', s, Math.abs(a[s + 'Elbow'])]);
+      ['legAbd', s, Math.asin(Math.max(-1, Math.min(1, dot(thigh, lat) * sgn))) / R], ['ankle', s, between(shin, foot) - 90], ['elbow', s, Math.abs(a[s + 'Elbow'])],
+      ['twist', s, (extras[s + 'FootOut'] ?? 0) - (extras[s + 'LegRot'] ?? 0), a[s + 'Knee']]);
   }
-  out.push(['neck', null, a.neck ?? 0]);
+  out.push(['neck', null, a.neck ?? 0], ['lean', null, extras.lean ?? 0]);
   return out;
 }
-function judge(kind, side, v, knee) {
+export function judge(kind, side, v, knee) {
   const {usual: [lo, h0], extreme: [elo, ehi]} = RANGES[kind], hi = kind === 'hip' && knee >= 45 ? 160 : h0;
-  if (v >= lo && v <= hi) return null;
+  if ((v >= lo && v <= hi) || (kind === 'twist' && Math.abs(knee) < 30)) return null;   // genou presque tendu : la hanche tourne, pas le genou
   const far = v < elo || v > ehi, straight = kind === 'hip' && v > hi && knee < 45 ? ', jambe tendue' : '';
   return {level: far ? 'alerte' : 'attention', text: `${TEXT[kind](v, SIDE[side])}${straight} : ${far ? 'très ' : ''}au-delà de l’amplitude habituelle (${deg(v < lo ? lo : hi)}).`};
 }

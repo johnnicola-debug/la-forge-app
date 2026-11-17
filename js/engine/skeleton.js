@@ -75,19 +75,38 @@ export function interpolatePose(p, q, t, ease) {
 // Durée totale d'une séquence (ms) : chaque clé indique le temps pour l'atteindre depuis la précédente.
 export const sequenceDuration = seq => seq.keys.slice(1).reduce((s, k) => s + k.ms, 0);
 
+// Transition en cours à la position u ∈ [0, 1] : indice de la clé d'arrivée et avancement dans le temps (0 à 1).
+export function segment(seq, u) {
+  let t = Math.min(1, Math.max(0, u)) * sequenceDuration(seq), i = 1;
+  for (; i < seq.keys.length - 1 && t > seq.keys[i].ms; i++) t -= seq.keys[i].ms;
+  return {i, local: seq.keys[i].ms ? Math.min(1, t / seq.keys[i].ms) : 1};
+}
+
+// Passage sans arrêt : une clé marquée `passe` n'arrête pas le mouvement. Autour d'elle, chaque valeur suit une courbe
+// d'Hermite cubique dont la pente à cette clé vient de ses voisines (Catmull-Rom), bornée pour ne jamais dépasser ni
+// revenir en arrière (Fritsch-Carlson) ; une valeur qui change de sens s'y arrête. Les clés ordinaires restent des arrêts
+// (pente nulle) : sans clé `passe`, rien ne change, le rythme de la clé d'arrivée (doux, vif…) s'applique comme avant.
+export function slope(seq, k, get) {
+  const K = seq.keys;
+  if (!K[k]?.passe || k === 0 || k === K.length - 1) return 0;
+  const v0 = get(K[k - 1]), v1 = get(K[k]), v2 = get(K[k + 1]), d1 = (v1 - v0) / K[k].ms, d2 = (v2 - v1) / K[k + 1].ms;
+  if (d1 * d2 <= 0) return 0;
+  const m = (v2 - v0) / (K[k].ms + K[k + 1].ms);
+  return Math.sign(m) * Math.min(Math.abs(m), 3 * Math.abs(d1), 3 * Math.abs(d2));
+}
+export const hermite = (p0, p1, m0, m1, T, t) => { const t2 = t * t, t3 = t2 * t; return (2 * t3 - 3 * t2 + 1) * p0 + (t3 - 2 * t2 + t) * T * m0 + (3 * t2 - 2 * t3) * p1 + (t3 - t2) * T * m1; };
+
 // u ∈ [0, 1] sur toute la séquence. Renvoie la pose et l'indice de la phase en cours.
 export function samplePose(seq, u) {
-  const total = sequenceDuration(seq);
-  let t = Math.min(1, Math.max(0, u)) * total;
-  for (let i = 1; i < seq.keys.length; i++) {
-    const k = seq.keys[i];
-    if (t <= k.ms || i === seq.keys.length - 1) {
-      const local = k.ms ? Math.min(1, t / k.ms) : 1;
-      return {pose: interpolatePose(seq.keys[i - 1].pose, k.pose, local, k.ease), phase: local < 0.5 ? i - 1 : i};
-    }
-    t -= k.ms;
-  }
-  return {pose: seq.keys[0].pose, phase: 0};
+  if (seq.keys.length < 2) return {pose: seq.keys[0].pose, phase: 0};
+  const {i, local} = segment(seq, u), A = seq.keys[i - 1], B = seq.keys[i], phase = local < 0.5 ? i - 1 : i;
+  if (!A.passe && !B.passe) return {pose: interpolatePose(A.pose, B.pose, local, B.ease), phase};
+  const val = get => hermite(get(A), get(B), slope(seq, i - 1, get), slope(seq, i, get), B.ms, local), angles = {};
+  for (const k of ANGLE_KEYS) angles[k] = val(K => K.pose.angles[k] ?? 0);
+  const pose = {x: val(K => K.pose.x ?? 0), lift: val(K => K.pose.lift ?? 0), angles};
+  if (A.pose.z !== undefined || B.pose.z !== undefined) pose.z = val(K => K.pose.z ?? 0);
+  if (A.pose.d3?.face !== undefined || B.pose.d3?.face !== undefined) pose.d3 = {face: val(K => K.pose.d3?.face ?? 0)};
+  return {pose, phase};
 }
 
 // Position normalisée (u) de chaque clé.

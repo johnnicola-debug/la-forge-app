@@ -34,13 +34,15 @@ function cleanPose(p) {
 // Une clé : une pose, la durée pour l'atteindre (sauf la première), et au besoin un rythme, une confiance (vidéo) ou la marque « interpolée ».
 const cleanKey = (k, i) => ({label: cut(k?.label, 60) || `Étape ${i + 1}`, ...(i ? {ms: clamp(k?.ms, LIMITS.msMin, LIMITS.msMax, 500)} : {}), pose: cleanPose(k?.pose),
   ...(typeof k?.cue === 'string' ? {cue: k.cue.slice(0, 200)} : {}), ...(i && has(EASES, k?.ease) ? {ease: k.ease} : {}),
-  ...(Number.isFinite(k?.confidence) ? {confidence: clamp(k.confidence, 0, 1, 0)} : {}), ...(typeof k?.interpolated === 'boolean' ? {interpolated: k.interpolated} : {})});
+  ...(Number.isFinite(k?.confidence) ? {confidence: clamp(k.confidence, 0, 1, 0)} : {}), ...(typeof k?.interpolated === 'boolean' ? {interpolated: k.interpolated} : {}),
+  ...(i && k?.passe === true ? {passe: true} : {}), ...(i && Array.isArray(k?.glisse) ? {glisse: k.glisse.filter(s => s === 'lead' || s === 'rear')} : {})});
 
 const validPose = p => Boolean(p) && typeof p === 'object' && num(p.x, -2000, 2000) && num(p.lift, -200, 400) && opt(p.z, v => num(v, -2000, 2000))
   && Boolean(p.angles) && typeof p.angles === 'object' && ANGLE_KEYS.every(a => num(p.angles[a], -360, 360))
   && opt(p.d3, d => Boolean(d) && typeof d === 'object' && !Array.isArray(d) && Object.entries(d).every(([k, v]) => D3_KEYS.includes(k) && num(v, -1080, 1080)));
 const validKey = (k, i) => Boolean(k) && typeof k === 'object' && str(k.label, 60) && (i ? num(k.ms, LIMITS.msMin, LIMITS.msMax) : k.ms === undefined) && validPose(k.pose)
-  && opt(k.cue, v => txt(v, 200)) && opt(k.ease, v => has(EASES, v)) && opt(k.confidence, v => num(v, 0, 1)) && opt(k.interpolated, v => typeof v === 'boolean');
+  && opt(k.cue, v => txt(v, 200)) && opt(k.ease, v => has(EASES, v)) && opt(k.confidence, v => num(v, 0, 1)) && opt(k.interpolated, v => typeof v === 'boolean')
+  && opt(k.passe, v => v === true) && opt(k.glisse, v => Array.isArray(v) && v.length <= 2 && v.every(s => s === 'lead' || s === 'rear'));
 export const validMovement = m => Boolean(m && typeof m === 'object' && m.v === 1 && str(m.id, 80) && str(m.name, 100) && has(PRESETS, m.style) && has(DIMENSIONS, m.dimension)
   && Array.isArray(m.keys) && m.keys.length >= 2 && m.keys.length <= LIMITS.keys && m.keys.every(validKey)
   && m.origin && typeof m.origin === 'object' && has(MOVE_ORIGINS, m.origin.type) && opt(m.origin.ref, v => str(v, 80)) && opt(m.origin.text, v => txt(v, 500)) && opt(m.origin.code, v => str(v, 20))

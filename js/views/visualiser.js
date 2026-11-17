@@ -5,6 +5,7 @@ import {computeJoints, sequenceDuration} from '../engine/skeleton.js';
 import {inkFigure} from '../engine/render.js';
 import {movementLibrary, isBuiltin, DIMENSIONS, MOVE_ORIGINS, RELIABILITY} from '../engine/movement.js';
 import {entries} from '../data/library.js';
+import {sequencesV1} from '../data/sequences-v1.js';
 import {$, esc, page} from '../ui.js';
 
 const PLACES = {sur: 'Superposés', cote: 'Côte à côte', face: 'Face à face'};
@@ -18,7 +19,12 @@ export function render(ctx, app, [wanted]) {
   const V = ctx.vis ??= {filter: 'tout', compare: false, second: null, place: 'cote', last: null};
   let cur = find(wanted) ?? find(V.last) ?? find('direct-avant') ?? lib[0], viewer = null, no3d = false;
   V.last = cur.id;
-  if (!find(V.second) || V.second === cur.id) V.second = null;
+  // Avant / après : un geste du moteur peut être comparé à sa version 1 (avant la correction du 17/11/2026), jouée comme
+  // à l'époque (sans tenue des appuis). Le second mouvement est noté « v1:<identifiant> ».
+  const v1 = id => sequencesV1.find(q => q.id === id);
+  const second = id => id?.startsWith('v1:') ? (v1(id.slice(3)) ? {...v1(id.slice(3)), pin: false, name: `${v1(id.slice(3)).name} — version 1, avant correction`} : null) : find(id);
+  if (V.second?.startsWith('v1:') && V.second !== 'v1:' + cur.id) V.second = v1(cur.id) ? 'v1:' + cur.id : null;
+  if (!second(V.second) || V.second === cur.id) V.second = null;
   const mine = m => !isBuiltin(m.id), reduced = matchMedia('(prefers-reduced-motion: reduce)').matches;
   const filters = [['tout', 'Tout'], ...(lib.some(mine) ? [['miens', 'Les miens']] : []), ...Object.entries(DIMENSIONS).filter(([d]) => lib.some(m => m.dimension === d))];
   if (!filters.some(([f]) => f === V.filter)) V.filter = 'tout';
@@ -32,9 +38,10 @@ export function render(ctx, app, [wanted]) {
   const info = () => { const [href, label, title] = editLink(cur), fiche = entries.find(e => e.sequence === cur.id);
     return `<div><h2>${esc(cur.name)}</h2><p class="mv-tags"><span class="chip">${esc(DIMENSIONS[cur.dimension])}</span><span class="chip">${esc(MOVE_ORIGINS[cur.origin.type])}</span>
       <span class="chip" title="Ce que vaut l’animation, pas la technique : rien n’est validé par un enseignant.">${esc(RELIABILITY[cur.reliability.level])}</span><span class="chip">${secs(cur)} · ${cur.keys.length} étapes</span></p></div>
-    <div class="actions">${no3d ? '' : `<button data-act="compare" aria-pressed="${V.compare}" title="Jouer un second mouvement en même temps">⇄ Comparer</button>`}<a class="button" href="#${href}" title="${title}">${label}</a>
+    <div class="actions">${no3d ? '' : `<button data-act="compare" aria-pressed="${V.compare && !V.second?.startsWith('v1:')}" title="Jouer un second mouvement en même temps">⇄ Comparer</button>`}
+      ${no3d || mine(cur) || !v1(cur.id) ? '' : `<button data-act="before" aria-pressed="${V.second === 'v1:' + cur.id}" title="Voir côte à côte la version d’avant la correction">⟲ Avant correction</button>`}<a class="button" href="#${href}" title="${title}">${label}</a>
       ${fiche ? `<a class="button" href="#bibliotheque/${encodeURIComponent(fiche.id)}" title="Explications et principes de ce geste">▤ Fiche</a>` : ''}</div>`; };
-  const compareBar = () => { const b = find(V.second);
+  const compareBar = () => { const b = second(V.second);
     return b ? `<span><b>Ombre</b> ${esc(cur.name)} (${secs(cur)})</span><span class="b2"><b>Bleu</b> ${esc(b.name)} (${secs(b)})</span>
       <span class="seg" role="group" aria-label="Placement du second mouvement">${Object.entries(PLACES).map(([k, v]) => `<button data-place="${k}" aria-pressed="${k === V.place}">${v}</button>`).join('')}</span>
       <button data-act="stop">✕ Arrêter</button><small>Les deux mouvements commencent et finissent ensemble. Choisissez une autre vignette pour changer le second.</small>`
@@ -56,6 +63,7 @@ export function render(ctx, app, [wanted]) {
     const m = find(e.target.closest('.mv-card')?.dataset.id); if (!m) return;
     if (V.compare) { if (m === cur) return; V.second = m.id; viewer?.setSecond(m, V.place); }
     else { cur = m; V.last = m.id; history.replaceState(null, '', '#visualiser/' + encodeURIComponent(m.id)); if (viewer) viewer.setSequence(m, !reduced); else if (no3d) still(); }
+    if (V.second?.startsWith('v1:') && V.second !== 'v1:' + cur.id) { if (v1(cur.id)) { V.second = 'v1:' + cur.id; viewer?.setSecond(second(V.second), V.place); } else endCompare(); }
     paint();
   };
   $('#vz-filters').onclick = e => {
@@ -63,10 +71,15 @@ export function render(ctx, app, [wanted]) {
     V.filter = b.dataset.f; app.querySelectorAll('#vz-filters [data-f]').forEach(x => x.setAttribute('aria-pressed', String(x === b)));
     grid.innerHTML = cards() || '<p class="empty">Aucun mouvement ici.</p>';
   };
-  $('#vz-info').onclick = e => { if (!e.target.closest('[data-act=compare]')) return; if (V.compare) endCompare(); else V.compare = true; paint(); };
+  $('#vz-info').onclick = e => {
+    if (e.target.closest('[data-act=before]')) {
+      if (V.second === 'v1:' + cur.id) endCompare(); else { V.compare = true; V.second = 'v1:' + cur.id; viewer?.setSecond(second(V.second), V.place); }
+    } else if (e.target.closest('[data-act=compare]')) { if (V.compare) endCompare(); else V.compare = true; } else return;
+    paint();
+  };
   bar.onclick = e => {
     const b = e.target.closest('button'); if (!b) return;
-    if (b.dataset.place) { V.place = b.dataset.place; viewer?.setSecond(find(V.second), V.place); } else endCompare();
+    if (b.dataset.place) { V.place = b.dataset.place; viewer?.setSecond(second(V.second), V.place); } else endCompare();
     paint();
   };
   paint();
@@ -82,6 +95,6 @@ export function render(ctx, app, [wanted]) {
       ctx.cleanup.push(stop); viewer = stop;
     } catch { no3d = true; V.compare = false; V.second = null; still(); paint(); return; }
     if (cur !== first) viewer.setSequence(cur, !reduced);
-    if (V.compare && V.second) viewer.setSecond(find(V.second), V.place);
+    if (V.compare && V.second) viewer.setSecond(second(V.second), V.place);
   })();
 }

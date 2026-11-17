@@ -20,17 +20,18 @@ export {balance};
 export const ANGLE_LABELS = {torso: 'Inclinaison du buste', neck: 'Tête (flexion)', leadShoulder: 'Épaule avant', leadElbow: 'Coude avant', rearShoulder: 'Épaule arrière',
   rearElbow: 'Coude arrière', leadHip: 'Hanche avant', leadKnee: 'Genou avant', leadAnkle: 'Cheville avant', rearHip: 'Hanche arrière', rearKnee: 'Genou arrière', rearAnkle: 'Cheville arrière'};
 const D3_LABELS = {face: 'Orientation du corps (tour)', turn: 'Rotation des hanches', chestTurn: 'Rotation des épaules', leadAbd: 'Écart jambe avant', rearAbd: 'Écart jambe arrière',
-  leadFootOut: 'Pied avant ouvert', rearFootOut: 'Pied arrière ouvert', leadArmAbd: 'Bras avant écarté', rearArmAbd: 'Bras arrière écarté'};
+  leadFootOut: 'Pied avant ouvert', rearFootOut: 'Pied arrière ouvert', leadArmAbd: 'Bras avant écarté', rearArmAbd: 'Bras arrière écarté',
+  leadLegRot: 'Genou avant tourné vers l’extérieur', rearLegRot: 'Genou arrière tourné vers l’extérieur', lean: 'Buste penché sur le côté'};
 const STYLES = {boxe: 'Garde de boxe', escrime: 'Garde d’escrime', karate: 'Garde de karaté', carre: 'Garde carrée'};
 const EASES_FR = {doux: 'Douce', lineaire: 'Régulière', vif: 'Départ vif', retenu: 'Fin vive'};
 // Réglages de la partie attrapée, en mots simples : [type, clé, libellé, min, max]. Tout le reste est dans « Réglages fins ».
 const PART_SLIDERS = {
   arm: s => [['d3', s + 'ArmAbd', 'Écarter le bras', -30, 90]],
   upperArm: s => [['d3', s + 'ArmAbd', 'Écarter le bras', -30, 90]],
-  leg: s => [['d3', s + 'Abd', 'Écarter la jambe', -30, 90], ['d3', s + 'FootOut', 'Ouvrir le pied', -30, 90], ['angle', s + 'Ankle', 'Pointe du pied', -80, 60]],
-  thigh: s => [['d3', s + 'Abd', 'Écarter la jambe', -30, 90]],
+  leg: s => [['d3', s + 'Abd', 'Écarter la jambe', -30, 90], ['d3', s + 'FootOut', 'Ouvrir le pied', -30, 90], ['d3', s + 'LegRot', 'Tourner le genou', -30, 90], ['angle', s + 'Ankle', 'Pointe du pied', -80, 60]],
+  thigh: s => [['d3', s + 'Abd', 'Écarter la jambe', -30, 90], ['d3', s + 'LegRot', 'Tourner le genou', -30, 90]],
   pelvis: () => [['d3', 'turn', 'Tourner les hanches', -90, 90], ['d3', 'face', 'Tourner tout le corps', -180, 360], ['pos', 'lift', 'Sauter', 0, 80]],
-  trunk: () => [['d3', 'chestTurn', 'Tourner les épaules', -90, 90]],
+  trunk: () => [['d3', 'chestTurn', 'Tourner les épaules', -90, 90], ['d3', 'lean', 'Pencher sur le côté', -45, 45]],
   head: () => []
 };
 const HINTS = {arm: 'Faites-le glisser : l’épaule et le coude suivent.', upperArm: 'Faites-le glisser : le bras tourne autour de l’épaule.',
@@ -93,7 +94,8 @@ export function render(ctx, app, target, gid, baseId) {
     const k = key();
     $('#at-tools', root).innerHTML = `<label>Nom de l’étape <input id="at-step-name" maxlength="60" value="${esc(k.label)}"></label>
       ${E.k ? `<span class="at-dur" role="group" aria-label="Durée pour arriver à cette étape"><button data-act="faster" title="Plus rapide" aria-label="Plus rapide" ${k.ms <= STEP_MS.min ? 'disabled' : ''}>−</button><output>${secs(k.ms)}</output><button data-act="slower" title="Plus lent" aria-label="Plus lent" ${k.ms >= STEP_MS.max ? 'disabled' : ''}>+</button></span>
-        <label>Arrivée <select id="at-ease">${Object.entries(EASES_FR).map(([v, l]) => `<option value="${v}" ${(k.ease ?? 'doux') === v ? 'selected' : ''}>${l}</option>`).join('')}</select></label>`
+        <label>Arrivée <select id="at-ease">${Object.entries(EASES_FR).map(([v, l]) => `<option value="${v}" ${(k.ease ?? 'doux') === v ? 'selected' : ''}>${l}</option>`).join('')}</select></label>
+        ${E.k < g.keys.length - 1 ? `<label class="at-inline"><input type="checkbox" id="at-passe" ${k.passe ? 'checked' : ''}> Sans arrêt ici</label>` : ''}`
         : '<span class="subtle">Pose de départ</span>'}
       <span class="at-acts"><button data-act="add" ${g.keys.length >= target.maxKeys ? 'disabled' : ''}>＋ Ajouter une étape</button><button data-act="pick" aria-expanded="${E.picker}">Remplacer par un mouvement…</button><button data-act="remove" ${g.keys.length <= 2 ? 'disabled' : ''}>Supprimer l’étape</button></span>`;
   };
@@ -118,7 +120,7 @@ export function render(ctx, app, target, gid, baseId) {
       <label>Partir d’une pose existante<select id="at-from"><option value="">— choisir une pose d’un geste du moteur —</option>${sequences.map(s => `<optgroup label="${esc(s.name)}">${s.keys.map((k, i) => `<option value="${s.id}:${i}">${esc(k.label)}</option>`).join('')}</optgroup>`).join('')}</select></label></div>
       <h3>Étape ${E.k + 1} vue de profil</h3><div class="gsliders">${ANGLE_KEYS.map(a => slider('angle', a, ANGLE_LABELS[a], pose.angles[a], -200, 200)).join('')}
         ${slider('pos', 'x', 'Avancée du bassin', pose.x ?? 0, -400, 800)}${slider('pos', 'lift', 'Saut (hauteur)', pose.lift ?? 0, 0, 80)}${slider('pos', 'z', 'Décalage latéral (3D)', pose.z ?? 0, -300, 300)}</div>
-      <h3>Corps en 3D</h3><div class="gsliders">${D3_KEYS.map(k => slider('d3', k, D3_LABELS[k], ex[k], k === 'face' ? -180 : k === 'turn' || k === 'chestTurn' ? -90 : -30, k === 'face' ? 360 : 90)).join('')}</div>`;
+      <h3>Corps en 3D</h3><div class="gsliders">${D3_KEYS.map(k => slider('d3', k, D3_LABELS[k], ex[k], k === 'face' ? -180 : k === 'turn' || k === 'chestTurn' ? -90 : k === 'lean' ? -45 : -30, k === 'face' ? 360 : k === 'lean' ? 45 : 90)).join('')}</div>`;
   };
   const paintPicker = () => {
     const el = $('#at-picker', root); el.hidden = !E.picker;
@@ -182,6 +184,7 @@ export function render(ctx, app, target, gid, baseId) {
     if (t.id === 'at-name') { g.name = v.trim().slice(0, 100) || `Mon ${target.noun}`; t.value = g.name; commit(false); }
     else if (t.id === 'at-step-name') { key().label = v.trim().slice(0, 60) || `Étape ${E.k + 1}`; commit(false); }
     else if (t.id === 'at-ease') { if (v === 'doux') delete key().ease; else key().ease = v; commit(false); }
+    else if (t.id === 'at-passe') { if (t.checked) key().passe = true; else delete key().passe; commit(false); }
     else if (t.id === 'at-dim') { if (v) g.dimension = v; else delete g.dimension; commit(false); }
     else if (t.id === 'at-style') { g.style = v; g.keys.forEach(k => { delete k.pose.d3; }); show(true); commit(); }
     else if (t.id === 'at-from') {

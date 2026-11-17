@@ -320,6 +320,8 @@ button.chip { cursor: pointer; background: none; }
 .at-tools { display: flex; flex-wrap: wrap; gap: 8px 14px; align-items: end; }
 .at-tools label { margin: 0; }
 .at-tools input, .at-tools select { margin: 0; }
+.at-tools .at-inline { display: inline-flex; gap: 6px; align-items: center; }
+.at-tools .at-inline input { width: auto; }
 .at-dur { display: inline-flex; align-items: center; gap: 6px; }
 .atelier .at-dur button { min-width: 36px; padding: 5px 8px; font-size: 1.05rem; line-height: 1; }
 .at-dur output { min-width: 4.2em; text-align: center; font-variant-numeric: tabular-nums; }
