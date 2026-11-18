@@ -3,7 +3,7 @@
 // fiabilité : le lecteur 3D, la planche 2D, les enchaînements et le Creuset le lisent donc sans aucune conversion.
 // Les mouvements personnels vivent dans state.movements (champ facultatif, validé par validMovement).
 import {sequences, SEQUENCE_DIMENSION} from '../data/sequences.js';
-import {ANGLE_KEYS, JOINT_NAMES, EASES} from './skeleton.js';
+import {ANGLE_KEYS, JOINT_NAMES, EASES, GROUPS} from './skeleton.js';
 import {PRESETS, D3_KEYS} from './body3d.js';
 
 export const DIMENSIONS = {deplacement: 'Déplacements', garde: 'Gardes et postures', defense: 'Défense', attaque: 'Attaque', transition: 'Transitions',
@@ -35,14 +35,19 @@ function cleanPose(p) {
 const cleanKey = (k, i) => ({label: cut(k?.label, 60) || `Étape ${i + 1}`, ...(i ? {ms: clamp(k?.ms, LIMITS.msMin, LIMITS.msMax, 500)} : {}), pose: cleanPose(k?.pose),
   ...(typeof k?.cue === 'string' ? {cue: k.cue.slice(0, 200)} : {}), ...(i && has(EASES, k?.ease) ? {ease: k.ease} : {}),
   ...(Number.isFinite(k?.confidence) ? {confidence: clamp(k.confidence, 0, 1, 0)} : {}), ...(typeof k?.interpolated === 'boolean' ? {interpolated: k.interpolated} : {}),
-  ...(i && k?.passe === true ? {passe: true} : {}), ...(i && Array.isArray(k?.glisse) ? {glisse: k.glisse.filter(s => s === 'lead' || s === 'rear')} : {})});
+  ...(i && k?.passe === true ? {passe: true} : {}), ...(i && Array.isArray(k?.glisse) ? {glisse: k.glisse.filter(s => s === 'lead' || s === 'rear')} : {}),
+  ...(i && validTiming(k?.timing) ? {timing: k.timing} : {}), ...(typeof k?.phase === 'string' ? {phase: k.phase.slice(0, 40)} : {}),
+  ...(i && (k?.pivot === 'lead' || k?.pivot === 'rear') ? {pivot: k.pivot} : {})});
 
+// Fenêtres de temps par groupe du corps (skeleton.js, GROUPS) : [début, fin] entre 0 et 1.
+const validTiming = t => Boolean(t) && typeof t === 'object' && !Array.isArray(t) && Object.entries(t).every(([g, w]) => Object.hasOwn(GROUPS, g) && Array.isArray(w) && w.length === 2 && w.every(v => num(v, 0, 1)) && w[0] <= w[1]);
 const validPose = p => Boolean(p) && typeof p === 'object' && num(p.x, -2000, 2000) && num(p.lift, -200, 400) && opt(p.z, v => num(v, -2000, 2000))
   && Boolean(p.angles) && typeof p.angles === 'object' && ANGLE_KEYS.every(a => num(p.angles[a], -360, 360))
   && opt(p.d3, d => Boolean(d) && typeof d === 'object' && !Array.isArray(d) && Object.entries(d).every(([k, v]) => D3_KEYS.includes(k) && num(v, -1080, 1080)));
 const validKey = (k, i) => Boolean(k) && typeof k === 'object' && str(k.label, 60) && (i ? num(k.ms, LIMITS.msMin, LIMITS.msMax) : k.ms === undefined) && validPose(k.pose)
   && opt(k.cue, v => txt(v, 200)) && opt(k.ease, v => has(EASES, v)) && opt(k.confidence, v => num(v, 0, 1)) && opt(k.interpolated, v => typeof v === 'boolean')
-  && opt(k.passe, v => v === true) && opt(k.glisse, v => Array.isArray(v) && v.length <= 2 && v.every(s => s === 'lead' || s === 'rear'));
+  && opt(k.passe, v => v === true) && opt(k.glisse, v => Array.isArray(v) && v.length <= 2 && v.every(s => s === 'lead' || s === 'rear'))
+  && opt(k.timing, validTiming) && opt(k.phase, v => txt(v, 40)) && opt(k.pivot, v => v === 'lead' || v === 'rear');
 export const validMovement = m => Boolean(m && typeof m === 'object' && m.v === 1 && str(m.id, 80) && str(m.name, 100) && has(PRESETS, m.style) && has(DIMENSIONS, m.dimension)
   && Array.isArray(m.keys) && m.keys.length >= 2 && m.keys.length <= LIMITS.keys && m.keys.every(validKey)
   && m.origin && typeof m.origin === 'object' && has(MOVE_ORIGINS, m.origin.type) && opt(m.origin.ref, v => str(v, 80)) && opt(m.origin.text, v => txt(v, 500)) && opt(m.origin.code, v => str(v, 20))

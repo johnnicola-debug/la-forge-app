@@ -17,7 +17,20 @@ export const RANGES = {
   neck: {usual: [-55, 60], extreme: [-80, 80]},
   legAbd: {usual: [-30, 50], extreme: [-45, 95]},    // jambe écartée du bassin sur le côté (négatif : croisée)
   twist: {usual: [-35, 35], extreme: [-55, 55]},     // genou plié (30° et plus) qui ne pointe pas comme le pied : torsion
-  lean: {usual: [-30, 30], extreme: [-45, 45]}       // buste penché sur le côté
+  lean: {usual: [-30, 30], extreme: [-45, 45]},      // buste penché sur le côté
+  // Squelette version 3 — amplitudes moyennes de l'adulte (AAOS) : rotation cervicale ≈ 80°, inclinaison ≈ 45°, rotation de
+  // l'humérus interne 70° / externe 90°, pronation et supination 80°, poignet flexion 80° / extension 70°, extension du gros
+  // orteil 70° ; arrière-pied inversion ≈ 30° / éversion ≈ 15° ; bassin : repères prudents propres à l'outil.
+  neckRot: {usual: [-80, 80], extreme: [-95, 95]},   // tête par rapport aux épaules
+  headTilt: {usual: [-40, 40], extreme: [-50, 50]},
+  armRot: {usual: [-70, 90], extreme: [-85, 105]},
+  pronation: {usual: [-80, 80], extreme: [-95, 95]},
+  wrist: {usual: [-70, 80], extreme: [-85, 95]},
+  footRoll: {usual: [-15, 30], extreme: [-25, 45]},
+  toes: {usual: [0, 70], extreme: [0, 90]},
+  pelvisTilt: {usual: [-20, 25], extreme: [-30, 35]},
+  pelvisList: {usual: [-15, 15], extreme: [-25, 25]},
+  spineRot: {usual: [-45, 45], extreme: [-60, 60]}   // épaules par rapport au bassin : rotation thoraco-lombaire ≈ 45° (AAOS)
 };
 // Vitesse moyenne en ligne droite pour atteindre une étape (sous-estime le trajet réel), en m/s.
 export const SPEEDS = [['leadWrist', 'Poing avant', 10], ['rearWrist', 'Poing arrière', 10], ['leadAnkle', 'Pied avant', 15], ['rearAnkle', 'Pied arrière', 15], ['pelvis', 'Bassin', 6]];
@@ -33,7 +46,17 @@ const TEXT = {
   trunk: v => v < 0 ? `Buste renversé en arrière de ${deg(v)}` : `Buste penché en avant de ${deg(v)}`,
   legAbd: (v, s) => v < 0 ? `Jambe ${s} croisée de ${deg(v)}` : `Jambe ${s} écartée de ${deg(v)}`,
   twist: (v, s) => `Genou ${s} et pied mal alignés (${deg(v)} de torsion du genou)`,
-  lean: v => `Buste penché sur le côté de ${deg(v)}`
+  lean: v => `Buste penché sur le côté de ${deg(v)}`,
+  neckRot: v => `Tête tournée de ${deg(v)} par rapport aux épaules`,
+  headTilt: v => `Tête inclinée de ${deg(v)}`,
+  armRot: (v, s) => `Bras ${s} tourné vers ${v < 0 ? 'l’intérieur' : 'l’extérieur'} de ${deg(v)}`,
+  pronation: (v, s) => `Avant-bras ${s} en ${v < 0 ? 'supination' : 'pronation'} de ${deg(v)}`,
+  wrist: (v, s) => `Poignet ${s} ${v < 0 ? 'en extension' : 'fléchi'} de ${deg(v)}`,
+  footRoll: (v, s) => `Arrière-pied ${s} en ${v < 0 ? 'éversion' : 'inversion'} de ${deg(v)}`,
+  toes: (v, s) => `Orteils ${s} relevés de ${deg(v)}`,
+  pelvisTilt: v => `Bassin basculé ${v < 0 ? 'en arrière' : 'en avant'} de ${deg(v)}`,
+  pelvisList: v => `Bassin incliné sur le côté de ${deg(v)}`,
+  spineRot: v => `Épaules tournées de ${deg(v)} par rapport au bassin`
 };
 const R = Math.PI / 180;
 const sag = a => [Math.sin(a * R), -Math.cos(a * R), 0];
@@ -53,9 +76,13 @@ export function anatomy(pose, extras) {
     const shin = rotY(rotX(sag(shinA), -abd * sgn), rot), foot = rotY(sag(shinA + 90 + (a[s + 'Ankle'] ?? 0)), -(extras[s + 'FootOut'] ?? 0) * sgn), t = flat(thigh, lat);
     out.push(['knee', s, a[s + 'Knee']], ['hip', s, Math.atan2(dot(cross(down, t), lat), dot(down, t)) / R, a[s + 'Knee']],
       ['legAbd', s, Math.asin(Math.max(-1, Math.min(1, dot(thigh, lat) * sgn))) / R], ['ankle', s, between(shin, foot) - 90], ['elbow', s, Math.abs(a[s + 'Elbow'])],
-      ['twist', s, (extras[s + 'FootOut'] ?? 0) - (extras[s + 'LegRot'] ?? 0), a[s + 'Knee']]);
+      ['twist', s, (extras[s + 'FootOut'] ?? 0) - (extras[s + 'LegRot'] ?? 0), a[s + 'Knee']],
+      ['armRot', s, extras[s + 'ArmRot'] ?? 0], ['pronation', s, extras[s + 'Pronation'] ?? 0], ['wrist', s, extras[s + 'WristFlex'] ?? 0],
+      ['footRoll', s, extras[s + 'FootRoll'] ?? 0], ['toes', s, extras[s + 'Toes'] ?? 0]);
   }
-  out.push(['neck', null, a.neck ?? 0], ['lean', null, extras.lean ?? 0]);
+  out.push(['neck', null, a.neck ?? 0], ['lean', null, extras.lean ?? 0], ['neckRot', null, (extras.headTurn ?? 0) - (extras.turn ?? 0) - (extras.chestTurn ?? 0)],
+    ['headTilt', null, extras.headTilt ?? 0], ['pelvisTilt', null, extras.pelvisTilt ?? 0], ['pelvisList', null, extras.pelvisList ?? 0],
+    ['spineRot', null, extras.chestTurn ?? 0]);
   return out;
 }
 export function judge(kind, side, v, knee) {

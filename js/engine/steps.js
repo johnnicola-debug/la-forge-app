@@ -38,7 +38,8 @@ export function replaceWithMovement(seq, k, src, max) {
     if (dz || pose.z !== undefined) pose.z = r1((pose.z ?? 0) + dz);
     if (other) pose.d3 = {...extrasOf(src, s.pose)};
     const key = {label: String(s.label || `Étape ${i + 1}`).slice(0, 60), pose};
-    if (i) { key.ms = stepMs(s.ms); if (s.ease) key.ease = s.ease; if (s.passe) key.passe = true; if (s.glisse) key.glisse = [...s.glisse]; }
+    if (i) { key.ms = stepMs(s.ms); if (s.ease) key.ease = s.ease; if (s.passe) key.passe = true; if (s.glisse) key.glisse = [...s.glisse]; if (s.timing) key.timing = clone(s.timing); if (s.pivot) key.pivot = s.pivot; }
+    if (typeof s.phase === 'string') key.phase = s.phase;
     if (typeof s.cue === 'string') key.cue = s.cue.slice(0, 200);
     return key;
   });

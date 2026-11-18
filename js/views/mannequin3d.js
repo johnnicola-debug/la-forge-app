@@ -28,7 +28,7 @@ export function dimsFromState(state) {
   return {...bodyDims({height: height ?? 175, span}), known: {height, span}};
 }
 
-const VIEWS = {'Trois-quarts': [2.2, 1.35, 2.2], Profil: [0.25, 1.05, 3.1], Face: [3.1, 1.15, 0.05], Dessus: [0.25, 3.8, 0.3], 'Première personne': null, Adversaire: null};
+const VIEWS = {'Trois-quarts': [2.2, 1.35, 2.2], Profil: [0.25, 1.05, 3.1], Face: [3.1, 1.15, 0.05], Dessus: [0.25, 3.8, 0.3], Pieds: null, 'Première personne': null, Adversaire: null};
 
 // `seqId` : identifiant d'une séquence du moteur, ou séquence composée (objet avec keys). `d3` : réglages 3D imposés (garde hybride).
 // `edit` : atelier de mouvement ({onSelect, onPart, onChange, onCommit}) ; l'étape montrée se modifie en attrapant ses poignées.
@@ -40,7 +40,8 @@ export async function mount3d(host, seqId, {muscles = [], glow = [], dims = body
   // Vues et options d'affichage : repliées sous « Affichage » dans le lecteur complet, inchangées dans la vue épurée.
   const viewBtns = `<span class="views">${Object.keys(VIEWS).map(v => `<button data-view="${v}" aria-pressed="${v === 'Trois-quarts'}">${v}</button>`).join('')}</span>`;
   const toggles = `<label><input type="checkbox" data-act="skeleton"> Squelette</label><label><input type="checkbox" data-act="ghosts" checked> Fantômes</label><label><input type="checkbox" data-act="com" checked> Centre de masse</label>
-    <label><input type="checkbox" data-act="zones" ${muscles.length ? 'checked' : ''}> Zones sollicitées</label>`;
+    <label><input type="checkbox" data-act="zones" ${muscles.length ? 'checked' : ''}> Zones sollicitées</label>
+    <label><input type="checkbox" data-act="contacts"> Appuis</label><label><input type="checkbox" data-act="trails"> Trajectoires</label><label><input type="checkbox" data-act="axes"> Axes</label>`;
   host.innerHTML = `<div class="m3d ${compact ? 'compact' : ''} ${minimal ? 'minimal' : ''} ${edit ? 'edit' : ''}"><div class="m3d-canvas"></div>
     ${compact ? '' : `<div class="timeline">${steps()}</div>
     <div class="controls"><button data-act="prev" title="Étape précédente" aria-label="Étape précédente">«</button><button data-act="back" title="Image précédente" aria-label="Image précédente">‹</button><button data-act="play">${loop || autoplay ? 'Pause' : 'Lire'}</button><button data-act="fwd" title="Image suivante" aria-label="Image suivante">›</button><button data-act="next" title="Étape suivante" aria-label="Étape suivante">»</button>
@@ -86,47 +87,103 @@ export async function mount3d(host, seqId, {muscles = [], glow = [], dims = body
 
   // Silhouette : segments coniques + sphères aux articulations (formes continues), tronc tourné, tête, poings, pieds.
   const r = f => f * H;
-  const LIMBS = [['Shoulder', 'Elbow', r(.034), r(.028), 'upperArm'], ['Elbow', 'Wrist', r(.026), r(.02), 'forearm'],
+  // Membres : cylindres coniques entre articulations ; l'avant-bras s'arrête au poignet anatomique, la main est dessinée à part.
+  const LIMBS = [['Shoulder', 'Elbow', r(.034), r(.028), 'upperArm'], ['Elbow', 'Carpus', r(.027), r(.021), 'forearm'],
     ['Hip', 'Knee', r(.055), r(.035), 'thigh'], ['Knee', 'Ankle', r(.034), r(.022), 'shin']];
-  const JOINT_R = {Shoulder: r(.036), Elbow: r(.027), Wrist: r(.026), Hip: r(.05), Knee: r(.035), Ankle: r(.022)};
-  const JOINT_PART = {Shoulder: 'upperArm', Elbow: 'forearm', Wrist: 'forearm', Hip: 'pelvis', Knee: 'thigh', Ankle: 'foot'};
-  const lathe = new THREE.LatheGeometry([[0.001, -0.06], [0.098, -0.04], [0.104, 0.08], [0.088, 0.3], [0.08, 0.45], [0.094, 0.66], [0.104, 0.8], [0.106, 0.9], [0.07, 0.99], [0.03, 1.02]]
-    .map(([x, y]) => new THREE.Vector2(x * H, y)), 28);   // rayon en fraction de la taille, hauteur en fraction du tronc
-  const sph = new THREE.SphereGeometry(1, 28, 18), up = new THREE.Vector3(0, 1, 0);
+  const JOINT_R = {Shoulder: r(.036), Elbow: r(.027), Carpus: r(.02), Hip: r(.05), Knee: r(.035), Ankle: r(.022)};
+  const JOINT_PART = {Shoulder: 'upperArm', Elbow: 'forearm', Carpus: 'forearm', Hip: 'pelvis', Knee: 'thigh', Ankle: 'foot'};
+  // Tronc en deux volumes qui suivent la colonne (squelette v3) : lombaires et abdomen (bassin → milieu du dos), thorax (→ base
+  // du cou). Rayon en fraction de la taille, hauteur en fraction du tronc ; chacun a sa propre inclinaison et sa propre rotation.
+  const PROFILE = [[0.001, -0.06], [0.098, -0.04], [0.104, 0.08], [0.088, 0.3], [0.08, 0.45], [0.094, 0.66], [0.0954, 0.68], [0.104, 0.8], [0.106, 0.9], [0.07, 0.99], [0.03, 1.02]];
+  const latheOf = (a, b, base, len) => new THREE.LatheGeometry(PROFILE.filter(([, h]) => h >= a - 1e-9 && h <= b + 1e-9).map(([x, h]) => new THREE.Vector2(x * H, (h - base) / len)), 28);
+  const latheLow = latheOf(-0.06, 0.68, 0, 0.68), latheHigh = latheOf(0.68, 1.02, 0.68, 0.32);
+  const sph = new THREE.SphereGeometry(1, 28, 18), boxGeo = new THREE.BoxGeometry(1, 1, 1), stick = new THREE.CylinderGeometry(1, 1, 1, 14), cone = new THREE.ConeGeometry(1, 1, 14), up = new THREE.Vector3(0, 1, 0);
+  const SHARED = new Set([sph, boxGeo, stick, cone, latheLow, latheHigh]);
   function makeFigure(mat, ghost) {
-    const g = new THREE.Group(), parts = {limbs: [], joints: [], vols: {}};
+    const g = new THREE.Group(), parts = {limbs: [], joints: [], vols: {}, hands: {}};
     const mk = (geo, part) => { const m = new THREE.Mesh(geo, ghost ? mat : showZones.on && zoneParts.has(part) ? matZone : mat); m.castShadow = !ghost; m.userData.part = part; g.add(m); return m; };
     for (const side of ['lead', 'rear']) {
       for (const [a, b, ra, rb, part] of LIMBS) parts.limbs.push([mk(new THREE.CylinderGeometry(rb, ra, 1, 22), part), side + a, side + b]);
       for (const [jn, rad] of Object.entries(JOINT_R)) { const m = mk(sph, JOINT_PART[jn]); m.scale.setScalar(rad); parts.joints.push([m, side + jn]); }
-      parts.vols[side + 'Fist'] = mk(sph, 'forearm'); parts.vols[side + 'Foot'] = mk(sph, 'foot');
+      parts.hands[side] = {palm: mk(boxGeo, 'forearm'), fingers: mk(boxGeo, 'forearm'), thumb: mk(stick, 'forearm')};   // paume, doigts, pouce
+      parts.vols[side + 'Foot'] = mk(sph, 'foot'); parts.vols[side + 'Toes'] = mk(sph, 'foot'); parts.vols[side + 'Clav'] = mk(stick, 'chest');
     }
-    parts.vols.torso = mk(lathe, 'torso'); parts.vols.chest = mk(sph, 'chest'); parts.vols.pelvis = mk(sph, 'pelvis');
-    parts.vols.neck = mk(new THREE.CylinderGeometry(r(.026), r(.03), 1, 16), 'neck'); parts.vols.head = mk(sph, 'head');
+    parts.vols.torsoLow = mk(latheLow, 'torso'); parts.vols.torsoHigh = mk(latheHigh, 'torso'); parts.vols.chest = mk(sph, 'chest'); parts.vols.pelvis = mk(sph, 'pelvis');
+    parts.vols.neck = mk(new THREE.CylinderGeometry(r(.026), r(.03), 1, 16), 'neck'); parts.vols.head = mk(sph, 'head'); parts.vols.nose = mk(cone, 'head');
     g.userData = parts; scene.add(g); return g;
   }
   const V = p => new THREE.Vector3(p[0], p[1], p[2]);
-  const qYaw = new THREE.Quaternion(), qTilt = new THREE.Quaternion();
+  const qa = new THREE.Quaternion(), qb = new THREE.Quaternion(), mtx = new THREE.Matrix4(), X1 = new THREE.Vector3(1, 0, 0);
+  // Orientation d'après un repère : x le long de `x`, y vers `y` (rendu perpendiculaire), z = x × y.
+  const basis = (q, x, y) => { const A = x.clone().normalize(), C = new THREE.Vector3().crossVectors(A, y).normalize(), B = new THREE.Vector3().crossVectors(C, A); mtx.makeBasis(A, B, C); return q.setFromRotationMatrix(mtx); };
+  const segmentQ = (q, axis, yawDeg) => { qa.setFromUnitVectors(up, axis.clone().normalize()); qb.setFromAxisAngle(up, (yawDeg - 90) * Math.PI / 180); return q.copy(qa).multiply(qb); };
+  const stretch = (m, A, B, rad) => { const d = B.clone().sub(A), len = d.length() || 1e-6; m.position.copy(A).addScaledVector(d, 0.5); m.quaternion.setFromUnitVectors(up, d.normalize()); m.scale.set(rad, len, rad); };
   function pose(fig, j, e) {
-    const {limbs, joints, vols} = fig.userData;
+    const {limbs, joints, vols, hands} = fig.userData, F = j.frames;
     for (const [m, a, b] of limbs) { const A = V(j[a]), B = V(j[b]), d = B.clone().sub(A), len = d.length(); m.position.copy(A).addScaledVector(d, 0.5); m.quaternion.setFromUnitVectors(up, d.normalize()); m.scale.set(1, len, 1); }
     for (const [m, k] of joints) m.position.copy(V(j[k]));
-    const pel = V(j.pelvis), nb = V(j.neckBase), axis = nb.clone().sub(pel), T = axis.length();
-    qTilt.setFromUnitVectors(up, axis.clone().normalize());
-    const yawT = ((e.face ?? 0) + e.turn + e.chestTurn * 0.5 - 90) * Math.PI / 180; qYaw.setFromAxisAngle(up, yawT);
-    vols.torso.position.copy(pel); vols.torso.quaternion.copy(qTilt).multiply(qYaw); vols.torso.scale.set(1, T, 0.58);
-    vols.chest.position.copy(pel.clone().lerp(nb, 0.74)); vols.chest.quaternion.copy(vols.torso.quaternion); vols.chest.scale.set(r(.088), r(.075), r(.062));
-    vols.pelvis.position.copy(pel); vols.pelvis.quaternion.copy(qTilt).multiply(qYaw.setFromAxisAngle(up, ((e.face ?? 0) + e.turn - 90) * Math.PI / 180)); vols.pelvis.scale.set(r(.09), r(.06), r(.062));
+    // Tronc : chaque volume suit son segment de colonne (la torsion se répartit au lieu de tourner d'un bloc).
+    const pel = V(j.pelvis), mid = V(j.spineMid), nb = V(j.neckBase);
+    vols.torsoLow.position.copy(pel); segmentQ(vols.torsoLow.quaternion, mid.clone().sub(pel), (F.spine[0].yaw + F.spine[1].yaw) / 2); vols.torsoLow.scale.set(1, mid.distanceTo(pel), 0.58);
+    vols.torsoHigh.position.copy(mid); segmentQ(vols.torsoHigh.quaternion, nb.clone().sub(mid), F.spine[2].yaw); vols.torsoHigh.scale.set(1, nb.distanceTo(mid), 0.58);
+    vols.chest.position.copy(mid.clone().lerp(nb, 0.2)); vols.chest.quaternion.copy(vols.torsoHigh.quaternion); vols.chest.scale.set(r(.088), r(.075), r(.062));
+    // Bassin : large le long de l'axe des hanches (rotation et inclinaison), dressé selon les lombaires (bascule).
+    vols.pelvis.position.copy(pel); basis(vols.pelvis.quaternion, V(j.leadHip).sub(V(j.rearHip)), V(F.pelvis.up)); vols.pelvis.scale.set(r(.09), r(.06), r(.062));
     const hd = V(j.head), nk = hd.clone().sub(nb), nl = nk.length() * 0.55;
     vols.neck.position.copy(nb).addScaledVector(nk.clone().normalize(), nl / 2); vols.neck.quaternion.setFromUnitVectors(up, nk.normalize()); vols.neck.scale.set(1, nl, 1);
-    vols.head.position.copy(hd); vols.head.quaternion.copy(vols.neck.quaternion); vols.head.scale.set(r(.058), r(.068), r(.054));
+    // Tête : orientée par le regard ; le nez montre où elle regarde ; inclinaison autour de l'axe du regard.
+    const hf = V(F.head.fwd), hu = V(F.head.up);
+    basis(vols.head.quaternion, hf, hu); if (F.head.tilt) vols.head.quaternion.multiply(qa.setFromAxisAngle(X1, F.head.tilt * Math.PI / 180));
+    vols.head.position.copy(hd); vols.head.scale.set(r(.06), r(.068), r(.056));
+    vols.nose.position.copy(hd).addScaledVector(hf, r(.06)).addScaledVector(hu, -r(.01)); vols.nose.quaternion.setFromUnitVectors(up, hf); vols.nose.scale.set(r(.011), r(.03), r(.011));
     for (const s of ['lead', 'rear']) {
-      vols[s + 'Fist'].position.copy(V(j[s + 'Wrist'])); vols[s + 'Fist'].scale.setScalar(r(.03));
-      const heel = V(j[s + 'Heel']), toe = V(j[s + 'Toe']), fd = toe.clone().sub(heel), fl = fd.length();
-      vols[s + 'Foot'].position.copy(heel).addScaledVector(fd, 0.5); vols[s + 'Foot'].quaternion.setFromUnitVectors(new THREE.Vector3(1, 0, 0), fd.normalize()); vols[s + 'Foot'].scale.set(fl / 2, r(.024), r(.03));
+      const sg = s === 'lead' ? 1 : -1;
+      stretch(vols[s + 'Clav'], nb.clone().addScaledVector(V(F.spine[2].up), -r(.03)), V(j[s + 'Shoulder']), r(.024));   // clavicule et trapèze
+      // Main : paume et doigts orientés par la pronation et le poignet ; poing (doigts repliés) ou main ouverte ; pouce côté radial.
+      const h = F[s + 'Hand'], fw = V(h.fwd), pa = V(h.palm), wr = V(j[s + 'Carpus']), fist = V(j[s + 'Wrist']), thumbDir = new THREE.Vector3().crossVectors(fw, pa).multiplyScalar(sg), {palm, fingers, thumb} = hands[s];
+      basis(palm.quaternion, fw, pa.clone().negate()); fingers.quaternion.copy(palm.quaternion);
+      if (h.open > 0.5) {
+        palm.position.copy(wr).addScaledVector(fw, r(.03)); palm.scale.set(r(.06), r(.016), r(.05));
+        fingers.position.copy(wr).addScaledVector(fw, r(.085)); fingers.scale.set(r(.052), r(.012), r(.046));
+        stretch(thumb, wr.clone().addScaledVector(thumbDir, r(.02)), wr.clone().addScaledVector(thumbDir, r(.045)).addScaledVector(fw, r(.035)), r(.008));
+      } else {
+        palm.position.copy(fist).addScaledVector(pa, -r(.006)); palm.scale.set(r(.05), r(.028), r(.05));
+        fingers.position.copy(fist).addScaledVector(fw, r(.014)).addScaledVector(pa, r(.012)); fingers.scale.set(r(.03), r(.028), r(.05));
+        stretch(thumb, wr.clone().addScaledVector(thumbDir, r(.02)).addScaledVector(fw, r(.012)), fist.clone().addScaledVector(thumbDir, r(.022)).addScaledVector(pa, r(.012)), r(.009));
+      }
+      // Pied : arrière-pied du talon aux têtes des métatarsiens, orteils articulés (à plat au sol quand l'avant-pied porte).
+      const ft = F[s + 'Foot'], sole = V(ft.S), heel = V(j[s + 'Heel']), ball = V(j[s + 'Toe']), fd = ball.clone().sub(heel);
+      vols[s + 'Foot'].position.copy(heel).addScaledVector(fd, 0.5).addScaledVector(sole, -r(.022)); basis(vols[s + 'Foot'].quaternion, fd, sole.clone().negate()); vols[s + 'Foot'].scale.set(fd.length() / 2 + r(.012), r(.024), r(.03));
+      const td = V(ft.toeDir), base = V(j[s + 'Mtp1']).lerp(V(j[s + 'Mtp5']), 0.45);
+      vols[s + 'Toes'].position.copy(base).addScaledVector(td, r(.02)).addScaledVector(sole, -r(.01)); basis(vols[s + 'Toes'].quaternion, td, sole.clone().negate()); vols[s + 'Toes'].scale.set(r(.024), r(.011), r(.028));
     }
   }
   const main = makeFigure(matBody, false);
+  // ——— Analyse (« Affichage ») : repères d'appui de chaque pied (vert : posé à moins de 1,2 cm du sol), trajectoires
+  // (avant-pieds et talons, bassin, centre de masse estimé) et axes (bassin, thorax, regard). Absents des vues compactes.
+  const CONTACT_PTS = ['Heel', 'Mtp1', 'Mtp5', 'Hallux', 'Toes'], markers = [], contactGroup = new THREE.Group(), trailGroup = new THREE.Group(), axesGroup = new THREE.Group();
+  const markGeo = new THREE.CircleGeometry(r(.011), 16);
+  if (!compact) for (const s of ['lead', 'rear']) for (const k of CONTACT_PTS) {
+    const m = new THREE.Mesh(markGeo, new THREE.MeshBasicMaterial({color: '#5fc39b', transparent: true, opacity: 0.95, depthTest: false}));
+    m.rotation.x = -Math.PI / 2; m.renderOrder = 11; markers.push([m, s + k]); contactGroup.add(m);
+  }
+  const arrows = compact ? [] : [['pelvis', 'x'], ['pelvis', 'y'], ['chest', 'x'], ['chest', 'y'], ['head', 'x'], ['head', 'y']].map(([at, ax]) => {
+    const a = new THREE.ArrowHelper(new THREE.Vector3(1, 0, 0), new THREE.Vector3(), r(.12), ax === 'x' ? '#e0674c' : '#5fc39b', r(.025), r(.015)); a.userData = {at, ax}; axesGroup.add(a); return a; });
+  for (const g of [contactGroup, trailGroup, axesGroup]) { g.visible = false; scene.add(g); }
+  function buildTrails() {
+    if (compact) return;
+    trailGroup.children.slice().forEach(c => { trailGroup.remove(c); c.geometry.dispose(); });
+    const n = Math.max(30, Math.round(sequenceDuration(seq) / 1000 * 60)), P = {leadToe: [], rearToe: [], leadHeel: [], rearHeel: [], pelvis: [], com: []};
+    for (let i = 0; i <= n; i++) { const s3 = sample3d(seq, i / n, samplePose), jj = joints3d(s3.pose, dims, s3.extras), c = centerOfMass3d(jj);
+      for (const k of ['leadToe', 'rearToe', 'leadHeel', 'rearHeel', 'pelvis']) P[k].push(V(jj[k])); P.com.push(new THREE.Vector3(c[0], c[1], c[2])); }
+    const COLORS = {leadToe: '#e2c27a', rearToe: '#c98b4f', leadHeel: '#a89060', rearHeel: '#8d6a44', pelvis: '#7fb8e0', com: '#f0d78a'};
+    for (const [k, pts] of Object.entries(P)) trailGroup.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints(pts), new THREE.LineBasicMaterial({color: COLORS[k], transparent: true, opacity: 0.85, depthTest: k !== 'com'})));
+  }
+  function poseAnalysis(j) {
+    for (const [m, k] of markers) { const p = j[k]; m.position.set(p[0], 0.004, p[2]); m.visible = p[1] < 0.08; m.material.color.set(p[1] <= 0.012 ? '#5fc39b' : '#7a8288'); }
+    const F = j.frames, ref = {pelvis: [j.pelvis, V(j.leadHip).sub(V(j.rearHip)), F.pelvis.up], chest: [j.chest, V(j.leadShoulder).sub(V(j.rearShoulder)), F.spine[2].up], head: [j.head, F.head.fwd, F.head.up]};
+    for (const a of arrows) { const [at, x, y] = ref[a.userData.at]; a.position.copy(V(at)); a.setDirection((a.userData.ax === 'x' ? (x.isVector3 ? x : V(x)) : V(y)).clone().normalize()); }
+  }
   // Fantômes : une silhouette par pose clé (seize au plus, pour que les longs mouvements restent lisibles et fluides).
   const makeGhosts = (only = null) => { if (compact) return []; const n = seq.keys.length, every = Math.ceil(n / 16);
     return seq.keys.filter((_, i) => only ? only.includes(i) : i % every === 0 || i === n - 1).map(k => { const g = makeFigure(matGhost, true), e = extrasOf(seq, k.pose); pose(g, joints3d(k.pose, dims, e), e); return g; }); };
@@ -181,13 +238,13 @@ export async function mount3d(host, seqId, {muscles = [], glow = [], dims = body
   }
   // Changer de mouvement sans reconstruire la scène : étapes, fantômes et curseur repartent du début.
   function rebuildGhosts() {
-    for (const g of ghosts) { scene.remove(g); g.traverse(o => { if (o.isMesh && o.geometry !== sph && o.geometry !== lathe) o.geometry.dispose(); }); }
+    for (const g of ghosts) { scene.remove(g); g.traverse(o => { if (o.isMesh && !SHARED.has(o.geometry)) o.geometry.dispose(); }); }   // géométries partagées : gardées
     // Atelier : pendant qu'on modifie une étape, seulement l'étape d'avant et celle d'après (pelure d'oignon).
     ghosts = makeGhosts(st.edit !== null && !st.playing ? [st.edit - 1, st.edit + 1] : null);
     const cb = $('[data-act=ghosts]', host); if (minimal || (cb && !cb.checked)) ghosts.forEach(g => { g.visible = false; });
   }
   function load(next, play = true) {
-    seq = typeof next === 'object' ? next : sequenceById(next); keys = keyPositions(seq); st.edit = null; rebuildGhosts();
+    seq = typeof next === 'object' ? next : sequenceById(next); keys = keyPositions(seq); st.edit = null; rebuildGhosts(); if (trailGroup.visible) buildTrails(); else trailGroup.clear();
     const tl = $('.timeline', host); if (tl) tl.innerHTML = steps();
     st.u = 0; st.last = 0; st.playing = compact || loop || play; if (playBtn) playBtn.textContent = st.playing ? 'Pause' : 'Lire';
     update();
@@ -206,6 +263,7 @@ export async function mount3d(host, seqId, {muscles = [], glow = [], dims = body
     const s3 = ek ? {pose: ek.pose, phase: st.edit, extras: extrasOf(seq, ek.pose)} : sample3d(seq, st.u, samplePose);
     const p = s3.pose, phase = s3.phase, extras = d3 ? {...s3.extras, ...d3} : s3.extras, j = joints3d(p, dims, extras);
     st.j = j; st.face = extras.face ?? 0; pose(main, j, extras);
+    if (!compact && (contactGroup.visible || axesGroup.visible)) poseAnalysis(j);
     for (const m of handles) {
       const {name, joint, base, color} = m.userData, sel = name === st.part; m.visible = Boolean(ek);
       if (ek) { m.position.copy(V(j[joint])); m.scale.setScalar(base * (sel ? 1.55 : name === st.hover ? 1.3 : 1)); m.material.color.set(sel ? '#ffffff' : color); }
@@ -222,7 +280,8 @@ export async function mount3d(host, seqId, {muscles = [], glow = [], dims = body
     host.querySelectorAll('[data-key]').forEach(b => b.setAttribute('aria-pressed', String(Number(b.dataset.key) === phase)));
     $('.bar', host).style.width = `${st.u * 100}%`; scrub.value = Math.round(st.u * 1000);
     timeEl.textContent = `${(st.u * sequenceDuration(seq) / 1000).toFixed(2).replace('.', ',')} s`;
-    cue.innerHTML = `<strong>${esc(seq.keys[phase].label)}</strong> · ${esc(seq.keys[phase].cue ?? '')}`;
+    const ai = keys.findIndex((p, k) => k > 0 && p >= st.u - 1e-9), ph = seq.keys[ai > 0 ? ai : seq.keys.length - 1]?.phase;   // phase de la transition en cours (préparation, transfert…)
+    cue.innerHTML = `${ph ? `<em class="m3d-phase">${esc(ph)}</em> · ` : ''}<strong>${esc(seq.keys[phase].label)}</strong> · ${esc(seq.keys[phase].cue ?? '')}`;
   }
   // Vues : fixes (caméra libre ensuite), première personne (depuis les yeux, vers la cible) et adversaire (face au pratiquant).
   function follow() {
@@ -232,11 +291,16 @@ export async function mount3d(host, seqId, {muscles = [], glow = [], dims = body
       camera.position.set(hd[0] + 0.1 * fx, hd[1] + 0.02, hd[2] + 0.1 * fz); camera.lookAt(hd[0] + 2 * fx, hd[1] - 0.45, hd[2] + 2 * fz);
     } else if (st.view === 'Adversaire') {
       camera.position.set(j.pelvis[0] + 2.3, 1.62 * H / 1.75, 0.15); camera.lookAt(j.pelvis[0], 1.05 * H / 1.75, 0);
+    } else if (st.view === 'Pieds') {   // gros plan des appuis : la caméra vise surtout le pied posé (poids continu, pas de saut d'image)
+      const mid = k => j[k + 'Heel'].map((v, i) => (v + j[k + 'Toe'][i]) / 2), w = k => Math.min(1, Math.max(0.05, 1 - Math.min(j[k + 'Heel'][1], j[k + 'Mtp1'][1], j[k + 'Mtp5'][1]) / 0.15));
+      const A = mid('lead'), B = mid('rear'), wa = w('lead'), wb = w('rear'), cx = (A[0] * wa + B[0] * wb) / (wa + wb), cz = (A[2] * wa + B[2] * wb) / (wa + wb);
+      const d = Math.max(0.65, 1.3 * Math.hypot(A[0] - B[0], A[2] - B[2]) * Math.min(wa, wb) / Math.max(wa, wb));
+      camera.position.set(cx + 0.45 * d, 0.55 * d, cz + 0.8 * d); camera.lookAt(cx, 0.04, cz);
     }
   }
   const setView = v => {
     st.view = v; const fixed = VIEWS[v];
-    controls.enabled = Boolean(fixed); main.userData.vols.head.visible = main.userData.vols.neck.visible = v !== 'Première personne';
+    controls.enabled = Boolean(fixed); main.userData.vols.head.visible = main.userData.vols.neck.visible = main.userData.vols.nose.visible = v !== 'Première personne';
     // Avec un adversaire, la caméra se recule et vise entre les deux corps.
     const wide = opponent || second?.place === 'face', cx = wide ? 0.8 : 0.15, k = wide ? 1.35 : 1;
     if (fixed) { camera.position.set(...fixed.map((x, i) => i === 1 ? x * H / 1.75 : i === 0 ? cx + (x - 0.15) * k : x * k)); controls.target.set(cx, 0.95 * H / 1.75, 0); controls.update(); } else follow();
@@ -273,6 +337,8 @@ export async function mount3d(host, seqId, {muscles = [], glow = [], dims = body
     if (a === 'ghosts') ghosts.forEach(g => g.visible = e.target.checked);
     if (a === 'skeleton') setSkeleton(e.target.checked);
     if (a === 'com') comGroup.visible = e.target.checked;
+    if (a === 'contacts' || a === 'axes') { (a === 'axes' ? axesGroup : contactGroup).visible = e.target.checked; if (st.j) poseAnalysis(st.j); }
+    if (a === 'trails') { if (e.target.checked && !trailGroup.children.length) buildTrails(); trailGroup.visible = e.target.checked; }
     if (a === 'zones') main.traverse(m => { if (m.isMesh) m.material = e.target.checked && zoneParts.has(m.userData.part) ? matZone : matBody; });
   };
   host.addEventListener('input', onInput); host.addEventListener('change', e => { if (e.target.type === 'checkbox') onInput(e); });
@@ -285,6 +351,7 @@ export async function mount3d(host, seqId, {muscles = [], glow = [], dims = body
     st.playing = false; if (playBtn) playBtn.textContent = 'Lire';
     keys = keyPositions(seq); st.edit = k; st.u = keys[k] ?? 0;
     if (changed || rebuild) rebuildGhosts();
+    if (rebuild && trailGroup.visible) buildTrails();
     update();
   }
   function select(name) { st.part = name ?? null; update(); }
@@ -332,7 +399,7 @@ export async function mount3d(host, seqId, {muscles = [], glow = [], dims = body
       if (!st.drag || e.pointerId !== st.drag.id) return;
       e.stopPropagation(); const moved = st.drag.moved; st.drag = null;
       controls.enabled = Boolean(VIEWS[st.view]); cvs.style.cursor = ''; try { cvs.releasePointerCapture(e.pointerId); } catch {}
-      if (moved) edit.onCommit?.(st.edit);
+      if (moved) { edit.onCommit?.(st.edit); if (trailGroup.visible) buildTrails(); }
     };
     box.addEventListener('pointerup', release, true); box.addEventListener('pointercancel', release, true);
   }

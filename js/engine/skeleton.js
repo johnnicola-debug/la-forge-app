@@ -96,16 +96,45 @@ export function slope(seq, k, get) {
 }
 export const hermite = (p0, p1, m0, m1, T, t) => { const t2 = t * t, t3 = t2 * t; return (2 * t3 - 3 * t2 + 1) * p0 + (t3 - 2 * t2 + t) * T * m0 + (3 * t2 - 2 * t3) * p1 + (t3 - t2) * T * m1; };
 
+// Décalages entre parties du corps : une clé peut donner, pour la transition qui y mène, la fenêtre de temps de chaque groupe
+// (`timing: {tete: [0, 0.6], bras: [0.3, 1]}` : la tête a fini aux 60 %, les bras ne partent qu'à 30 %). Sans `timing`,
+// tout le corps commence et finit ensemble, comme avant.
+export const GROUPS = {
+  jambes: ['leadHip', 'leadKnee', 'leadAnkle', 'rearHip', 'rearKnee', 'rearAnkle', 'leadAbd', 'rearAbd', 'leadLegRot', 'rearLegRot', 'leadFootOut', 'rearFootOut', 'leadFootRoll', 'rearFootRoll', 'leadToes', 'rearToes'],
+  bassin: ['x', 'z', 'lift', 'face', 'turn', 'pelvisTilt', 'pelvisList'],
+  tronc: ['torso', 'lean', 'chestTurn'],
+  tete: ['neck', 'headTurn', 'headTilt'],
+  bras: ['leadShoulder', 'leadElbow', 'rearShoulder', 'rearElbow', 'leadArmAbd', 'rearArmAbd', 'leadArmRot', 'rearArmRot', 'leadPronation', 'rearPronation', 'leadWristFlex', 'rearWristFlex', 'leadHandOpen', 'rearHandOpen']
+};
+const GROUP_OF = Object.fromEntries(Object.entries(GROUPS).flatMap(([g, ks]) => ks.map(k => [k, g])));
+export const groupOf = k => GROUP_OF[k] ?? 'bassin';
+export const groupTime = (key, group, t) => {
+  const w = key?.timing?.[group]; if (!w) return t;
+  return w[1] > w[0] ? Math.min(1, Math.max(0, (t - w[0]) / (w[1] - w[0]))) : t >= w[0] ? 1 : 0;
+};
+
+// Valeur d'une grandeur du groupe `group` à l'instant `local` de la transition vers la clé i : rythme de la clé, fenêtre de
+// temps du groupe (`timing`), passage sans arrêt (`passe`). La courbe d'Hermite est calée sur la durée réelle de la fenêtre ;
+// une fenêtre qui ne touche pas une clé (départ retardé, arrivée en avance) y impose une vitesse nulle : la vitesse reste
+// continue d'une transition à l'autre, sans à-coup.
+export function groupValue(seq, i, local, group, get) {
+  const K = seq.keys, A = K[i - 1], B = K[i], [w0, w1] = B.timing?.[group] ?? [0, 1], t = groupTime(B, group, local);
+  if (!A.passe && !B.passe) return get(A) + (get(B) - get(A)) * easing(B.ease)(t);
+  const prev = A.timing?.[group]?.[1] ?? 1, next = K[i + 1]?.timing?.[group]?.[0] ?? 0;
+  const m0 = w0 > 0 || prev < 1 ? 0 : slope(seq, i - 1, get), m1 = w1 < 1 || next > 0 ? 0 : slope(seq, i, get);
+  return hermite(get(A), get(B), m0, m1, Math.max(0.05, w1 - w0) * B.ms, t);
+}
+
 // u ∈ [0, 1] sur toute la séquence. Renvoie la pose et l'indice de la phase en cours.
 export function samplePose(seq, u) {
   if (seq.keys.length < 2) return {pose: seq.keys[0].pose, phase: 0};
   const {i, local} = segment(seq, u), A = seq.keys[i - 1], B = seq.keys[i], phase = local < 0.5 ? i - 1 : i;
-  if (!A.passe && !B.passe) return {pose: interpolatePose(A.pose, B.pose, local, B.ease), phase};
-  const val = get => hermite(get(A), get(B), slope(seq, i - 1, get), slope(seq, i, get), B.ms, local), angles = {};
-  for (const k of ANGLE_KEYS) angles[k] = val(K => K.pose.angles[k] ?? 0);
-  const pose = {x: val(K => K.pose.x ?? 0), lift: val(K => K.pose.lift ?? 0), angles};
-  if (A.pose.z !== undefined || B.pose.z !== undefined) pose.z = val(K => K.pose.z ?? 0);
-  if (A.pose.d3?.face !== undefined || B.pose.d3?.face !== undefined) pose.d3 = {face: val(K => K.pose.d3?.face ?? 0)};
+  if (!A.passe && !B.passe && !B.timing) return {pose: interpolatePose(A.pose, B.pose, local, B.ease), phase};
+  const angles = {}, val = (get, k) => groupValue(seq, i, local, groupOf(k), get);
+  for (const k of ANGLE_KEYS) angles[k] = val(K => K.pose.angles[k] ?? 0, k);
+  const pose = {x: val(K => K.pose.x ?? 0, 'x'), lift: val(K => K.pose.lift ?? 0, 'lift'), angles};
+  if (A.pose.z !== undefined || B.pose.z !== undefined) pose.z = val(K => K.pose.z ?? 0, 'z');
+  if (A.pose.d3?.face !== undefined || B.pose.d3?.face !== undefined) pose.d3 = {face: val(K => K.pose.d3?.face ?? 0, 'face')};
   return {pose, phase};
 }
 

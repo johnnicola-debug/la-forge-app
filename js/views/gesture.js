@@ -21,22 +21,30 @@ export const ANGLE_LABELS = {torso: 'Inclinaison du buste', neck: 'Tête (flexio
   rearElbow: 'Coude arrière', leadHip: 'Hanche avant', leadKnee: 'Genou avant', leadAnkle: 'Cheville avant', rearHip: 'Hanche arrière', rearKnee: 'Genou arrière', rearAnkle: 'Cheville arrière'};
 const D3_LABELS = {face: 'Orientation du corps (tour)', turn: 'Rotation des hanches', chestTurn: 'Rotation des épaules', leadAbd: 'Écart jambe avant', rearAbd: 'Écart jambe arrière',
   leadFootOut: 'Pied avant ouvert', rearFootOut: 'Pied arrière ouvert', leadArmAbd: 'Bras avant écarté', rearArmAbd: 'Bras arrière écarté',
-  leadLegRot: 'Genou avant tourné vers l’extérieur', rearLegRot: 'Genou arrière tourné vers l’extérieur', lean: 'Buste penché sur le côté'};
+  leadLegRot: 'Genou avant tourné vers l’extérieur', rearLegRot: 'Genou arrière tourné vers l’extérieur', lean: 'Buste penché sur le côté',
+  pelvisTilt: 'Bassin basculé (avant +)', pelvisList: 'Bassin incliné (côté avant +)', headTurn: 'Tête tournée', headTilt: 'Tête inclinée',
+  leadArmRot: 'Bras avant tourné (humérus)', rearArmRot: 'Bras arrière tourné (humérus)', leadPronation: 'Poing avant tourné (pronation)', rearPronation: 'Poing arrière tourné (pronation)',
+  leadWristFlex: 'Poignet avant fléchi', rearWristFlex: 'Poignet arrière fléchi', leadHandOpen: 'Main avant ouverte (0 / 1)', rearHandOpen: 'Main arrière ouverte (0 / 1)',
+  leadFootRoll: 'Arrière-pied avant (inversion +)', rearFootRoll: 'Arrière-pied arrière (inversion +)', leadToes: 'Orteils avant relevés', rearToes: 'Orteils arrière relevés'};
+// Bornes des curseurs des réglages 3D (degrés ; la main ouverte est un interrupteur 0 / 1).
+const D3_RANGE = {face: [-180, 360], turn: [-90, 90], chestTurn: [-90, 90], lean: [-45, 45], pelvisTilt: [-30, 35], pelvisList: [-25, 25], headTurn: [-180, 180], headTilt: [-50, 50],
+  leadArmRot: [-90, 105], rearArmRot: [-90, 105], leadPronation: [-90, 95], rearPronation: [-90, 95], leadWristFlex: [-85, 95], rearWristFlex: [-85, 95],
+  leadHandOpen: [0, 1], rearHandOpen: [0, 1], leadFootRoll: [-25, 45], rearFootRoll: [-25, 45], leadToes: [0, 90], rearToes: [0, 90]};
 const STYLES = {boxe: 'Garde de boxe', escrime: 'Garde d’escrime', karate: 'Garde de karaté', carre: 'Garde carrée'};
 const EASES_FR = {doux: 'Douce', lineaire: 'Régulière', vif: 'Départ vif', retenu: 'Fin vive'};
 // Réglages de la partie attrapée, en mots simples : [type, clé, libellé, min, max]. Tout le reste est dans « Réglages fins ».
 const PART_SLIDERS = {
-  arm: s => [['d3', s + 'ArmAbd', 'Écarter le bras', -30, 90]],
-  upperArm: s => [['d3', s + 'ArmAbd', 'Écarter le bras', -30, 90]],
-  leg: s => [['d3', s + 'Abd', 'Écarter la jambe', -30, 90], ['d3', s + 'FootOut', 'Ouvrir le pied', -30, 90], ['d3', s + 'LegRot', 'Tourner le genou', -30, 90], ['angle', s + 'Ankle', 'Pointe du pied', -80, 60]],
+  arm: s => [['d3', s + 'ArmAbd', 'Écarter le bras', -30, 90], ['d3', s + 'ArmRot', 'Tourner le bras', -90, 105], ['d3', s + 'Pronation', 'Tourner le poing', -90, 95], ['d3', s + 'HandOpen', 'Ouvrir la main', 0, 1]],
+  upperArm: s => [['d3', s + 'ArmAbd', 'Écarter le bras', -30, 90], ['d3', s + 'ArmRot', 'Tourner le bras', -90, 105]],
+  leg: s => [['d3', s + 'Abd', 'Écarter la jambe', -30, 90], ['d3', s + 'FootOut', 'Ouvrir le pied', -30, 90], ['d3', s + 'LegRot', 'Tourner le genou', -30, 90], ['angle', s + 'Ankle', 'Pointe du pied', -80, 60], ['d3', s + 'FootRoll', 'Bord du pied (inversion +)', -25, 45]],
   thigh: s => [['d3', s + 'Abd', 'Écarter la jambe', -30, 90], ['d3', s + 'LegRot', 'Tourner le genou', -30, 90]],
-  pelvis: () => [['d3', 'turn', 'Tourner les hanches', -90, 90], ['d3', 'face', 'Tourner tout le corps', -180, 360], ['pos', 'lift', 'Sauter', 0, 80]],
+  pelvis: () => [['d3', 'turn', 'Tourner les hanches', -90, 90], ['d3', 'pelvisTilt', 'Basculer le bassin', -30, 35], ['d3', 'pelvisList', 'Incliner le bassin', -25, 25], ['d3', 'face', 'Tourner tout le corps', -180, 360], ['pos', 'lift', 'Sauter', 0, 80]],
   trunk: () => [['d3', 'chestTurn', 'Tourner les épaules', -90, 90], ['d3', 'lean', 'Pencher sur le côté', -45, 45]],
-  head: () => []
+  head: () => [['d3', 'headTurn', 'Tourner la tête', -180, 180], ['d3', 'headTilt', 'Incliner la tête', -50, 50]]
 };
 const HINTS = {arm: 'Faites-le glisser : l’épaule et le coude suivent.', upperArm: 'Faites-le glisser : le bras tourne autour de l’épaule.',
   leg: 'Faites-le glisser : la hanche et le genou suivent ; un pied posé reste à plat.', thigh: 'Faites-le glisser : la cuisse tourne autour de la hanche.',
-  head: 'Faites-la glisser pour pencher la tête.', trunk: 'Faites-le glisser pour pencher le buste.', pelvis: 'Faites-le glisser pour déplacer le corps sur le sol.'};
+  head: 'Faites-la glisser pour pencher la tête ; tournez-la ici.', trunk: 'Faites-le glisser pour pencher le buste.', pelvis: 'Faites-le glisser pour déplacer le corps sur le sol.'};
 const GUIDE = ['Choisir une étape', 'Attraper un point doré', 'Lire le mouvement'];
 const clone = o => JSON.parse(JSON.stringify(o));
 const secs = ms => `${(ms / 1000).toFixed(2).replace('.', ',')} s`;
@@ -120,7 +128,7 @@ export function render(ctx, app, target, gid, baseId) {
       <label>Partir d’une pose existante<select id="at-from"><option value="">— choisir une pose d’un geste du moteur —</option>${sequences.map(s => `<optgroup label="${esc(s.name)}">${s.keys.map((k, i) => `<option value="${s.id}:${i}">${esc(k.label)}</option>`).join('')}</optgroup>`).join('')}</select></label></div>
       <h3>Étape ${E.k + 1} vue de profil</h3><div class="gsliders">${ANGLE_KEYS.map(a => slider('angle', a, ANGLE_LABELS[a], pose.angles[a], -200, 200)).join('')}
         ${slider('pos', 'x', 'Avancée du bassin', pose.x ?? 0, -400, 800)}${slider('pos', 'lift', 'Saut (hauteur)', pose.lift ?? 0, 0, 80)}${slider('pos', 'z', 'Décalage latéral (3D)', pose.z ?? 0, -300, 300)}</div>
-      <h3>Corps en 3D</h3><div class="gsliders">${D3_KEYS.map(k => slider('d3', k, D3_LABELS[k], ex[k], k === 'face' ? -180 : k === 'turn' || k === 'chestTurn' ? -90 : k === 'lean' ? -45 : -30, k === 'face' ? 360 : k === 'lean' ? 45 : 90)).join('')}</div>`;
+      <h3>Corps en 3D</h3><div class="gsliders">${D3_KEYS.map(k => slider('d3', k, D3_LABELS[k], ex[k], ...(D3_RANGE[k] ?? [-30, 90]))).join('')}</div>`;
   };
   const paintPicker = () => {
     const el = $('#at-picker', root); el.hidden = !E.picker;

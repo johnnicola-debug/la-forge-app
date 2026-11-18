@@ -38,8 +38,10 @@ const downAxis = (h, extras) => {
 };
 // Une jambe se plie dans un plan tourné comme le genou (leadLegRot / rearLegRot, body3d.js).
 const legYaw = (h, extras) => h.kind === 'leg' || h.kind === 'thigh' ? -(extras[h.side + 'LegRot'] ?? 0) * SIGN[h.side] : 0;
+// Les bras tournent avec la ceinture scapulaire quand elle s'écarte de son orientation de repos (body3d.js).
+const armYaw = (h, extras) => (h.kind === 'arm' || h.kind === 'upperArm') && extras.armRest !== undefined ? extras.turn + extras.chestTurn - extras.armRest : 0;
 // Coordonnées (avant, bas) d'un vecteur du monde dans le plan de travail ; direction 0 = bas, 90 = avant, 180 = haut.
-const inPlane = (v, h, extras) => { const l = rotY(v, -(extras.face ?? 0) - legYaw(h, extras)), d = downAxis(h, extras); return [l[0], l[1] * d[1] + l[2] * d[2]]; };
+const inPlane = (v, h, extras) => { const l = rotY(v, -(extras.face ?? 0) - legYaw(h, extras) - armYaw(h, extras)), d = downAxis(h, extras); return [l[0], l[1] * d[1] + l[2] * d[2]]; };
 const dirOf = ([f, d]) => Math.atan2(f, d) / D;
 
 // Plan dans lequel la poignée glisse (repère du monde) : celui du membre, le profil pour la tête et le buste, le sol pour le bassin.
@@ -47,7 +49,7 @@ export function dragPlane(name, pose, extras, dims) {
   const h = HANDLES[name], j = joints3d(pose, dims, extras);
   if (h.kind === 'pelvis') return {point: j.pelvis, normal: [0, 1, 0]};
   const d = downAxis(h, extras);   // normale = avant × bas
-  return {point: j[h.joint], normal: rotY([0, -d[2], d[1]], (extras.face ?? 0) + legYaw(h, extras))};
+  return {point: j[h.joint], normal: rotY([0, -d[2], d[1]], (extras.face ?? 0) + legYaw(h, extras) + armYaw(h, extras))};
 }
 
 // Nouvelle pose quand la poignée `name` est amenée au point `target` (monde, mètres). On repart toujours de la pose
@@ -67,13 +69,17 @@ export function solve(name, start, extras, dims, target) {
     return p;
   }
   const s = h.side, v = inPlane(sub(target, j[s + ROOT[h.kind]]), h, extras);
-  if (h.kind === 'upperArm') { a[s + 'Shoulder'] = round(near(dirOf(v) - a.torso, a[s + 'Shoulder'])); return p; }
-  if (h.kind === 'thigh') { a[s + 'Hip'] = round(near(dirOf(v), a[s + 'Hip'])); return p; }
-  if (h.kind === 'arm') {   // l'avant-bras va de (épaule + coude) : un coude plié « en avant » a un angle positif
-    const side = a[s + 'Elbow'] < -20 ? -1 : 1, {dir, at, bend} = twoBone(v[0], v[1], dims.upperArm, dims.forearm + dims.fist);
-    a[s + 'Shoulder'] = round(near(dir - side * at - a.torso, a[s + 'Shoulder'])); a[s + 'Elbow'] = round(side * bend);
+  if (h.kind === 'upperArm' || h.kind === 'arm') {   // l'épaule suit le bras (omoplate) : trois passes, épaule recalculée à chaque fois
+    const side = a[s + 'Elbow'] < -20 ? -1 : 1;   // l'avant-bras va de (épaule + coude) : un coude plié « en avant » a un angle positif
+    for (let n = 0; n < 3; n++) {
+      const w = n ? inPlane(sub(target, joints3d(p, dims, extras)[s + 'Shoulder']), h, extras) : v;
+      if (h.kind === 'upperArm') { a[s + 'Shoulder'] = round(near(dirOf(w) - a.torso, a[s + 'Shoulder'])); continue; }
+      const {dir, at, bend} = twoBone(w[0], w[1], dims.upperArm, dims.forearm + dims.fist);
+      a[s + 'Shoulder'] = round(near(dir - side * at - a.torso, a[s + 'Shoulder'])); a[s + 'Elbow'] = round(side * bend);
+    }
     return p;
   }
+  if (h.kind === 'thigh') { a[s + 'Hip'] = round(near(dirOf(v), a[s + 'Hip'])); return p; }
   // Jambe : le tibia va de (hanche − genou). Un pied posé au sol au début du geste reste collé au sol tant qu'on ne le lève
   // pas franchement (5 cm) et garde son orientation (la cheville compense) ; un pied en l'air suit le tibia.
   const side = a[s + 'Knee'] < -20 ? -1 : 1, shin0 = a[s + 'Hip'] - a[s + 'Knee'], planted = Math.min(j[s + 'Heel'][1], j[s + 'Toe'][1]) < 0.02, y0 = j[s + 'Ankle'][1];

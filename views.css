@@ -336,3 +336,4 @@ button.chip { cursor: pointer; background: none; }
 .at-check .alerte { color: #f0735a; }
 .at-adv summary { cursor: pointer; color: var(--ink-2); }
 .at-adv[open] summary { margin-bottom: 8px; }
+.m3d .m3d-phase { font-style: normal; color: var(--gold); text-transform: uppercase; letter-spacing: .06em; font-size: .78rem; }

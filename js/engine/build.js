@@ -31,7 +31,8 @@ export function move(style, ref, {angles = {}, x, z, drop = 0, d3, feet = {}, fr
   for (const side of ['lead', 'rear']) {
     if (free.includes(side)) continue;
     const f = feet[side] ?? {}, on = f.on ?? anchor(jR, side), w = jR[side + on];   // un point d'appui reste au ras du sol
-    reachFoot(p, ex, side, [w[0] + (f.dx ?? 0), w[1] <= 0.02 ? 0 : w[1], w[2] + (f.dz ?? 0)], y, DIMS, {at: on, pitch: f.pitch});
+    const ground = Math.min(jR[side + 'Heel'][1], jR[side + 'Mtp1'][1], jR[side + 'Mtp5'][1]) <= 0.02;   // pied au sol : talon ou têtes des métatarsiens
+    reachFoot(p, ex, side, [w[0] + (f.dx ?? 0), ground ? 0 : w[1], w[2] + (f.dz ?? 0)], y, DIMS, {at: on, pitch: f.pitch});
     keepAbd(p, ex, side);
   }
   return tidy(p);
@@ -55,6 +56,15 @@ export function over(style, ref, side, {aim = 0.45, free = [], part = 1} = {}) {
     const ex = extrasOf({style}, p);
     for (const [s, on, w] of keep) { reachFoot(p, ex, s, w, y, DIMS, {at: on}); keepAbd(p, ex, s); }
   }
+  return tidy(p);
+}
+
+// Placer un pied en l'air au point `target` du monde (mètres) : `at` 'Heel' (talon), 'Toe' (avant-pied) ou 'Ankle' ;
+// `pitch` : inclinaison du pied (sinon celle de la pose). Sert à faire suivre une ligne droite à un pied qui frappe.
+export function foot(style, ref, side, target, {at: on = 'Heel', pitch} = {}) {
+  const p = clone(ref), ex = extrasOf({style}, p), j = at(style, p);
+  reachFoot(p, ex, side, target, j.pelvis[1], DIMS, {at: on, pitch}); keepAbd(p, ex, side);
+  if (ex[side + 'LegRot'] !== (p.d3?.[side + 'LegRot'] ?? extrasOf({style}, ref)[side + 'LegRot'])) p.d3 = {...p.d3, [side + 'LegRot']: ex[side + 'LegRot']};
   return tidy(p);
 }
 
